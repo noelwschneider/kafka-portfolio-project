@@ -1,0 +1,441 @@
+openapi: 3.1.0
+
+info:
+  title: Order Service API
+  version: 1.0.0
+  description: |
+    Public REST surface of the Order Service — the only service that accepts order creation and the
+    only owner of order lifecycle status.
+
+    **Frozen by Phase 0.** Changes must follow the coordination protocol in
+    `docs/planning/agent-guidance.md`'s Agent Coordination Rules section: propose the change in this
+    file first with a rationale, then update implementations and tests.
+
+    Related contracts:
+      - `docs/events/event-catalog.md` — events this service publishes and consumes
+      - `docs/order-state-machine.md` — the `status` values below and their valid transitions
+      - `docs/db-ownership.md` — tables this service owns
+
+    **Asynchrony.** `POST /api/orders` returns as soon as the order is persisted and `OrderCreated`
+    is published. It does not wait for inventory, payment, or fulfillment. Clients observe the rest
+    of the lifecycle by polling `GET /api/orders/{orderId}` or subscribing to
+    `GET /api/orders/stream`.
+
+    **Health and metrics** are exposed by Spring Boot Actuator (`/actuator/health`,
+    `/actuator/health/liveness`, `/actuator/health/readiness`, `/actuator/metrics`) and are
+    deliberately outside this document.
+
+servers:
+  - url: http://localhost:8081
+    description: Local development
+
+tags:
+  - name: orders
+    description: Production-style order API. Never mixed with demo/fault-injection endpoints.
+
+paths:
+  /api/orders:
+    post:
+      tags: [orders]
+      operationId: createOrder
+      summary: Create an order
+      description: |
+        Validates the request, persists the order with status `PENDING`, publishes `OrderCreated`,
+        and returns immediately. A `201` means the order was **accepted**, not fulfilled — inventory
+        may still reject it asynchronously.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+            examples:
+              singleItem:
+                summary: Two mechanical keyboards
+                value:
+                  customerId: demo-customer
+                  items:
+                    - sku: SKU-001
+                      quantity: 2
+      responses:
+        '201':
+          description: Order accepted and persisted.
+          headers:
+            Location:
+              description: URI of the created order.
+              schema:
+                type: string
+              example: /api/orders/order-21873
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderAccepted'
+              examples:
+                accepted:
+                  value:
+                    id: order-21873
+                    status: PENDING
+                    createdAt: '2026-08-07T20:31:04.220Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    get:
+      tags: [orders]
+      operationId: listOrders
+      summary: List orders, newest first
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Filter by lifecycle status.
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+        - name: customerId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: A page of order summaries.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/orders/stream:
+    get:
+      tags: [orders]
+      operationId: streamOrderEvents
+      summary: Server-Sent Events stream of order status transitions
+      description: |
+        Long-lived `text/event-stream` connection, consumed by the frontend with the browser's native
+        `EventSource` (`docs/planning/frontend-design.md`'s Live Frontend Updates section).
+
+        Emits one SSE event named `order-status-changed` per lifecycle transition, carrying the order
+        id, the new status, the previous status, the `eventId` of the causing event where one exists,
+        the `correlationId`, and a timestamp. A periodic `keep-alive` comment keeps intermediaries
+        from closing an idle connection.
+
+        **The per-message JSON schema is intentionally not frozen here.** Phase 0 freezes the
+        endpoint, its content type, and its event names; message schemas land in Phase 2 alongside
+        `docs/events/schemas/*.json` (`docs/planning/execution-plan.md` §7), once real transitions
+        have been published.
+
+        Note for implementers: this literal path shares a prefix with `/api/orders/{orderId}`.
+        Spring resolves literal path segments ahead of template variables, so `stream` is never
+        matched as an order id — but `stream` must stay a reserved order id.
+      parameters:
+        - name: orderId
+          in: query
+          required: false
+          description: Restrict the stream to a single order. Omit to receive transitions for all orders.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Stream opened.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/orders/{orderId}:
+    get:
+      tags: [orders]
+      operationId: getOrder
+      summary: Get one order with its items and status history
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: order-21873
+      responses:
+        '200':
+          description: The order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetail'
+              examples:
+                fulfilled:
+                  value:
+                    id: order-21873
+                    customerId: demo-customer
+                    status: FULFILLED
+                    totalAmount: 258.00
+                    createdAt: '2026-08-07T20:31:04.220Z'
+                    updatedAt: '2026-08-07T20:31:04.447Z'
+                    items:
+                      - sku: SKU-001
+                        quantity: 2
+                        unitPrice: 129.00
+                    statusHistory:
+                      - status: PENDING
+                        sourceEventId: null
+                        occurredAt: '2026-08-07T20:31:04.220Z'
+                      - status: INVENTORY_RESERVED
+                        sourceEventId: 2b5f0a4e-1c8d-4f2a-9b77-8a41c2f9e6aa
+                        occurredAt: '2026-08-07T20:31:04.262Z'
+                      - status: PAYMENT_PENDING
+                        sourceEventId: null
+                        occurredAt: '2026-08-07T20:31:04.292Z'
+                      - status: PAID
+                        sourceEventId: 7c1e9b02-5f8e-4a2b-9d77-0b41c2f9e6aa
+                        occurredAt: '2026-08-07T20:31:04.372Z'
+                      - status: FULFILLMENT_PENDING
+                        sourceEventId: null
+                        occurredAt: '2026-08-07T20:31:04.373Z'
+                      - status: FULFILLED
+                        sourceEventId: 9a3d1f77-2c8e-4b2a-8d77-1b41c2f9e6bb
+                        occurredAt: '2026-08-07T20:31:04.447Z'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  schemas:
+    OrderStatus:
+      type: string
+      description: |
+        Order lifecycle status. Values and valid transitions are frozen in
+        `docs/order-state-machine.md`; `REJECTED_OUT_OF_STOCK`, `PAYMENT_FAILED`, `FULFILLED`, and
+        `FAILED` are terminal.
+      enum:
+        - PENDING
+        - INVENTORY_RESERVED
+        - REJECTED_OUT_OF_STOCK
+        - PAYMENT_PENDING
+        - PAID
+        - PAYMENT_FAILED
+        - FULFILLMENT_PENDING
+        - FULFILLED
+        - FAILED
+
+    CreateOrderRequest:
+      type: object
+      additionalProperties: false
+      required: [customerId, items]
+      properties:
+        customerId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Opaque demo identifier. No customer accounts exist in this project.
+          examples: [demo-customer]
+        items:
+          type: array
+          minItems: 1
+          maxItems: 20
+          description: At least one line. A SKU may appear at most once.
+          items:
+            $ref: '#/components/schemas/CreateOrderItem'
+
+    CreateOrderItem:
+      type: object
+      additionalProperties: false
+      required: [sku, quantity]
+      properties:
+        sku:
+          type: string
+          pattern: '^SKU-[0-9]{3}$'
+          examples: [SKU-001]
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 100
+          examples: [2]
+
+    OrderAccepted:
+      type: object
+      required: [id, status, createdAt]
+      properties:
+        id:
+          type: string
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        createdAt:
+          type: string
+          format: date-time
+
+    OrderSummary:
+      type: object
+      required: [id, customerId, status, totalAmount, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        customerId:
+          type: string
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        totalAmount:
+          type: number
+          multipleOf: 0.01
+          description: Sum of line quantity × unit price. Single implicit currency; no currency field.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    OrderDetail:
+      allOf:
+        - $ref: '#/components/schemas/OrderSummary'
+        - type: object
+          required: [items, statusHistory]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrderItem'
+            statusHistory:
+              type: array
+              description: Every transition this order has made, oldest first.
+              items:
+                $ref: '#/components/schemas/OrderStatusHistoryEntry'
+
+    OrderItem:
+      type: object
+      required: [sku, quantity, unitPrice]
+      properties:
+        sku:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        unitPrice:
+          type: number
+          multipleOf: 0.01
+          description: |
+            Captured at order creation from the Order Service's seeded SKU price map
+            (`docs/db-ownership.md`, "Where prices come from"). Not fetched from Inventory Service.
+
+    OrderStatusHistoryEntry:
+      type: object
+      required: [status, occurredAt]
+      properties:
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        sourceEventId:
+          type: [string, 'null']
+          format: uuid
+          description: |
+            Envelope `eventId` of the event that caused this transition, or `null` for the
+            transitions no inbound event causes (order creation, and the internal transitions in
+            `docs/order-state-machine.md` §3).
+        occurredAt:
+          type: string
+          format: date-time
+
+    OrderPage:
+      type: object
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderSummary'
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+        totalPages:
+          type: integer
+
+    ApiError:
+      type: object
+      description: |
+        Shared error shape from `docs/planning/high-level-design.md`'s API Error Model section,
+        produced by a central `@ControllerAdvice`.
+      required: [timestamp, status, error, code, message, path]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+        error:
+          type: string
+          description: HTTP reason phrase.
+        code:
+          type: string
+          description: |
+            Stable machine-readable code. Order Service uses: `VALIDATION_ERROR`, `INVALID_ORDER`,
+            `UNKNOWN_SKU`, `ORDER_NOT_FOUND`, `INTERNAL_ERROR`.
+        message:
+          type: string
+        path:
+          type: string
+        correlationId:
+          type: [string, 'null']
+          format: uuid
+          description: Correlation id for this request, when one was generated or propagated.
+
+  responses:
+    BadRequest:
+      description: Request validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          examples:
+            emptyItems:
+              value:
+                timestamp: '2026-08-07T20:31:04.220Z'
+                status: 400
+                error: Bad Request
+                code: INVALID_ORDER
+                message: Order must contain at least one item
+                path: /api/orders
+                correlationId: d89512f7-b544-4170-b66b-2e93f475ea8f
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          examples:
+            orderNotFound:
+              value:
+                timestamp: '2026-08-07T20:31:04.220Z'
+                status: 404
+                error: Not Found
+                code: ORDER_NOT_FOUND
+                message: No order with id order-00000
+                path: /api/orders/order-00000
+                correlationId: d89512f7-b544-4170-b66b-2e93f475ea8f
+    InternalError:
+      description: Unexpected server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'

@@ -1,0 +1,354 @@
+openapi: 3.1.0
+
+info:
+  title: Inventory Service API
+  version: 1.0.0
+  description: |
+    Public REST surface of the Inventory Service. Stock is owned exclusively by this service and is
+    changed by order workflow **events**, not by this API — `docs/planning/backend-design.md` 4.2
+    describes the management API below as "primarily for setup/demo administration rather than order
+    orchestration".
+
+    **Frozen by Phase 0.** Changes must follow the coordination protocol in
+    `docs/planning/agent-guidance.md`'s Agent Coordination Rules section.
+
+    Reservation work happens in the event path: this service consumes `OrderCreated` and publishes
+    `InventoryReserved` or `InventoryReservationFailed`, and consumes `PaymentRejected` to release a
+    reservation and publish `InventoryReleased` (`docs/events/event-catalog.md`).
+
+    **Two namespaces, never mixed** (`docs/planning/agent-guidance.md` rule 9):
+      - `/api` — production-style stock administration
+      - `/demo` — fault injection and consumer control, used only by Scenario Service
+
+    **Health and metrics** come from Spring Boot Actuator and are outside this document.
+
+servers:
+  - url: http://localhost:8082
+    description: Local development
+
+tags:
+  - name: inventory
+    description: Production-style stock administration.
+  - name: demo
+    description: |
+      Demo-only consumer control. Isolated from `/api` by construction. May be disabled or
+      protected by a simple demo configuration in any deployment where a reviewer should not be able
+      to reach it (`docs/planning/high-level-design.md`'s Security Scope section).
+
+paths:
+  /api/inventory:
+    get:
+      tags: [inventory]
+      operationId: listInventory
+      summary: List stock for every SKU
+      responses:
+        '200':
+          description: Current stock.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InventoryItem'
+              examples:
+                seeded:
+                  summary: Seed data from docs/planning/backend-design.md's Seed Data section
+                  value:
+                    - sku: SKU-001
+                      displayName: Mechanical Keyboard
+                      availableQuantity: 10
+                      reservedQuantity: 0
+                      version: 0
+                      updatedAt: '2026-08-07T20:00:00.000Z'
+                    - sku: SKU-002
+                      displayName: USB-C Dock
+                      availableQuantity: 5
+                      reservedQuantity: 0
+                      version: 0
+                      updatedAt: '2026-08-07T20:00:00.000Z'
+                    - sku: SKU-003
+                      displayName: Developer Mug
+                      availableQuantity: 100
+                      reservedQuantity: 0
+                      version: 0
+                      updatedAt: '2026-08-07T20:00:00.000Z'
+                    - sku: SKU-004
+                      displayName: External SSD
+                      availableQuantity: 2
+                      reservedQuantity: 0
+                      version: 0
+                      updatedAt: '2026-08-07T20:00:00.000Z'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/inventory/{sku}:
+    parameters:
+      - name: sku
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: '^SKU-[0-9]{3}$'
+        example: SKU-001
+    get:
+      tags: [inventory]
+      operationId: getInventoryItem
+      summary: Get stock for one SKU
+      responses:
+        '200':
+          description: The stock record.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryItem'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      tags: [inventory]
+      operationId: updateInventoryItem
+      summary: Set available quantity for one SKU
+      description: |
+        Setup/demo administration: overwrites `availableQuantity` for an existing SKU so a scenario
+        can be arranged from a known starting point. It does **not** create SKUs — the catalog is the
+        four seeded SKUs — and it does not touch `reservedQuantity`, which only the reservation logic
+        may change.
+
+        Rejected with `409` when the requested quantity is below the SKU's currently reserved
+        quantity, since accepting it would put the service into an oversold state that no event
+        caused.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateInventoryRequest'
+            examples:
+              restock:
+                value:
+                  availableQuantity: 10
+      responses:
+        '200':
+          description: Updated stock record.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Requested quantity conflicts with existing reservations.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              examples:
+                belowReserved:
+                  value:
+                    timestamp: '2026-08-07T20:31:04.220Z'
+                    status: 409
+                    error: Conflict
+                    code: INVENTORY_CONFLICT
+                    message: availableQuantity 1 is below the 2 units currently reserved for SKU-004
+                    path: /api/inventory/SKU-004
+                    correlationId: d89512f7-b544-4170-b66b-2e93f475ea8f
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /demo/consumers:
+    get:
+      tags: [demo]
+      operationId: listConsumers
+      summary: List this service's Kafka listeners and whether each is paused
+      responses:
+        '200':
+          description: Listener states.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConsumerState'
+              examples:
+                idle:
+                  value:
+                    - name: order-created
+                      topic: orders.events
+                      groupId: inventory-service
+                      paused: false
+                    - name: payment-rejected
+                      topic: payments.events
+                      groupId: inventory-service
+                      paused: false
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /demo/consumers/{consumerName}/pause:
+    post:
+      tags: [demo]
+      operationId: pauseConsumer
+      summary: Pause a Kafka listener
+      description: |
+        Pauses the named Spring Kafka listener container. This is a genuine pause — records accumulate
+        on the topic and are processed from the committed offset when the listener resumes. Nothing is
+        discarded and no delay is simulated (`docs/planning/backend-design.md` 4.6 requires the
+        consumer outage to genuinely stop processing).
+
+        Used by Scenario 5 (`docs/scenarios.md`). Idempotent: pausing an already-paused listener
+        succeeds.
+      parameters:
+        - $ref: '#/components/parameters/ConsumerName'
+      responses:
+        '200':
+          description: Listener paused.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsumerState'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /demo/consumers/{consumerName}/resume:
+    post:
+      tags: [demo]
+      operationId: resumeConsumer
+      summary: Resume a paused Kafka listener
+      description: |
+        Resumes the named listener, which then works through the backlog accumulated while it was
+        paused. Idempotent: resuming a running listener succeeds.
+      parameters:
+        - $ref: '#/components/parameters/ConsumerName'
+      responses:
+        '200':
+          description: Listener resumed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsumerState'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  parameters:
+    ConsumerName:
+      name: consumerName
+      in: path
+      required: true
+      description: Logical listener name as reported by `GET /demo/consumers`.
+      schema:
+        type: string
+      example: order-created
+
+  schemas:
+    InventoryItem:
+      type: object
+      required: [sku, displayName, availableQuantity, reservedQuantity, version, updatedAt]
+      properties:
+        sku:
+          type: string
+        displayName:
+          type: string
+        availableQuantity:
+          type: integer
+          minimum: 0
+          description: Units that may still be reserved.
+        reservedQuantity:
+          type: integer
+          minimum: 0
+          description: |
+            Units currently held by `RESERVED` reservations. Scenario 7's invariant is that this
+            never exceeds what was available (`docs/scenarios.md`).
+        version:
+          type: integer
+          description: |
+            Optimistic-locking version, exposed because the contention scenario's whole point is that
+            concurrent reservations are serialized by it rather than by luck.
+        updatedAt:
+          type: string
+          format: date-time
+
+    UpdateInventoryRequest:
+      type: object
+      additionalProperties: false
+      required: [availableQuantity]
+      properties:
+        availableQuantity:
+          type: integer
+          minimum: 0
+          maximum: 10000
+
+    ConsumerState:
+      type: object
+      required: [name, topic, groupId, paused]
+      properties:
+        name:
+          type: string
+        topic:
+          type: string
+        groupId:
+          type: string
+        paused:
+          type: boolean
+
+    ApiError:
+      type: object
+      description: |
+        Shared error shape from `docs/planning/high-level-design.md`'s API Error Model section.
+      required: [timestamp, status, error, code, message, path]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+        error:
+          type: string
+        code:
+          type: string
+          description: |
+            Inventory Service uses: `VALIDATION_ERROR`, `SKU_NOT_FOUND`, `CONSUMER_NOT_FOUND`,
+            `INVENTORY_CONFLICT`, `DEMO_DISABLED`, `INTERNAL_ERROR`.
+        message:
+          type: string
+        path:
+          type: string
+        correlationId:
+          type: [string, 'null']
+          format: uuid
+
+  responses:
+    BadRequest:
+      description: Request validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          examples:
+            skuNotFound:
+              value:
+                timestamp: '2026-08-07T20:31:04.220Z'
+                status: 404
+                error: Not Found
+                code: SKU_NOT_FOUND
+                message: No inventory item for SKU-999
+                path: /api/inventory/SKU-999
+                correlationId: d89512f7-b544-4170-b66b-2e93f475ea8f
+    InternalError:
+      description: Unexpected server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'

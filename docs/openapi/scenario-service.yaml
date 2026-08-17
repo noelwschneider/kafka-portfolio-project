@@ -1,0 +1,634 @@
+openapi: 3.1.0
+
+info:
+  title: Scenario Service API
+  version: 1.0.0
+  description: |
+    The demo/fault-injection control layer — `docs/planning/backend-design.md` 4.6's "dedicated
+    Scenario Service". Every path in this document is under `/demo`, and no path here belongs to any
+    business API. Business endpoints live in the other four specs and are never given
+    scenario-specific behavior (`docs/planning/agent-guidance.md` rules 9 and 10, and
+    `docs/planning/project-overview.md`'s Scope Principles: "do not put scenario-specific hacks inside
+    normal business endpoints").
+
+    **Frozen by Phase 0.** Changes must follow the coordination protocol in
+    `docs/planning/agent-guidance.md`'s Agent Coordination Rules section. Scenario definitions,
+    including what each one actually does to the backend, are in `docs/scenarios.md`.
+
+    **Scenario runs cause real work.** A run issues real `POST /api/orders` requests, sets real
+    simulator overrides, pauses real Kafka listeners, and publishes real records — including
+    deliberately duplicated and deliberately unprocessable ones. Nothing is animated or faked for the
+    UI.
+
+    **How a run is composed.** Scenario Service generates one `correlationId` per run and drives the
+    services through their own public APIs:
+      - orders via `POST /api/orders` on Order Service,
+      - payment outcomes via `PUT /demo/payment-behavior` on Payment Service,
+      - consumer outages via `POST /demo/consumers/{name}/pause|resume` on Inventory and Fulfillment
+        Service,
+      - duplicate and poison records by producing directly to Kafka.
+
+    Those cross-service calls are synchronous REST, even though
+    `docs/planning/implementation-phases.md`'s Phase 3 says to avoid synchronous service-to-service
+    calls for workflow. This is a control plane, not workflow: nothing in the order lifecycle depends
+    on it, and making demo control asynchronous would mean a scenario could not report a deterministic
+    start.
+
+    **Security.** These endpoints can trigger failures and reset state, so a deployment where a
+    reviewer should not reach them should disable or protect them with the simple demo configuration
+    described in `docs/planning/high-level-design.md`'s Security Scope section. No authentication is
+    specified for v1; the optional scheme below exists so a deployment can switch one on without a
+    contract change.
+
+servers:
+  - url: http://localhost:8085
+    description: Local development
+
+tags:
+  - name: scenarios
+    description: The eight demo scenarios and their runs.
+  - name: demo-admin
+    description: Environment reset.
+
+paths:
+  /demo/scenarios:
+    get:
+      tags: [scenarios]
+      operationId: listScenarios
+      summary: List the available scenarios and their descriptive metadata
+      description: |
+        Backs the scenario cards in `docs/planning/frontend-design.md`'s Scenarios page, each of which
+        needs a name, a short explanation, what it demonstrates, and the expected behavior. Served
+        rather than hardcoded in the frontend so that `docs/scenarios.md` and the UI cannot drift apart.
+      responses:
+        '200':
+          description: The scenario catalog.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScenarioDefinition'
+              examples:
+                catalog:
+                  value:
+                    - name: standard-order
+                      title: Standard Fulfillment
+                      description: Creates an order with available inventory and successful payment.
+                      demonstrates:
+                        - REST request
+                        - persistence
+                        - event publication
+                        - Kafka consumption
+                        - asynchronous workflow
+                        - state transitions
+                      expectedTerminalStatus: FULFILLED
+                      available: true
+                    - name: inventory-contention
+                      title: Inventory Contention
+                      description: Two concurrent orders compete for the last units of SKU-004.
+                      demonstrates:
+                        - concurrent access
+                        - transaction isolation
+                        - locking/versioning
+                        - consistency under contention
+                      expectedTerminalStatus: null
+                      available: true
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /demo/scenarios/{scenarioName}:
+    post:
+      tags: [scenarios]
+      operationId: runScenario
+      summary: Start a scenario run
+      description: |
+        Starts the named scenario and returns `202` with a run identifier immediately. The run then
+        proceeds asynchronously — most scenarios deliberately take time, and Scenario 5 waits while a
+        consumer is paused. Poll `GET /demo/scenario-runs/{runId}` or subscribe to
+        `GET /demo/scenario-runs/{runId}/stream` for progress.
+
+        `409` when a run of the same scenario is still `RUNNING`, so overlapping runs cannot corrupt
+        each other's inventory expectations or leave a paused consumer behind.
+      parameters:
+        - name: scenarioName
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ScenarioName'
+          example: standard-order
+      responses:
+        '202':
+          description: Run accepted and started.
+          headers:
+            Location:
+              description: URI of the run.
+              schema:
+                type: string
+              example: /demo/scenario-runs/run-193
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScenarioRun'
+              examples:
+                started:
+                  value:
+                    id: run-193
+                    scenarioName: standard-order
+                    status: RUNNING
+                    correlationId: d89512f7-b544-4170-b66b-2e93f475ea8f
+                    orderId: null
+                    startedAt: '2026-08-07T20:31:04.098Z'
+                    completedAt: null
+                    elapsedMs: null
+                    errorMessage: null
+                    timeline: []
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: A run of this scenario is already in progress.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              examples:
+                alreadyRunning:
+                  value:
+                    timestamp: '2026-08-07T20:31:04.220Z'
+                    status: 409
+                    error: Conflict
+                    code: SCENARIO_ALREADY_RUNNING
+                    message: Scenario standard-order is already running as run-193
+                    path: /demo/scenarios/standard-order
+                    correlationId: d89512f7-b544-4170-b66b-2e93f475ea8f
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /demo/scenario-runs:
+    get:
+      tags: [scenarios]
+      operationId: listScenarioRuns
+      summary: List recent scenario runs, newest first
+      description: |
+        Backs the recent-activity section of `docs/planning/frontend-design.md`'s Overview page.
+        Timelines are omitted from list entries; fetch a single run for its timeline.
+      parameters:
+        - name: scenarioName
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ScenarioName'
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ScenarioRunStatus'
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: A page of runs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScenarioRunPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /demo/scenario-runs/{runId}:
+    get:
+      tags: [scenarios]
+      operationId: getScenarioRun
+      summary: Get one scenario run with its timeline
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: The run.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScenarioRun'
+              examples:
+                completed:
+                  summary: A completed standard-order run
+                  value:
+                    id: run-193
+                    scenarioName: standard-order
+                    status: COMPLETED
+                    correlationId: d89512f7-b544-4170-b66b-2e93f475ea8f
+                    orderId: order-21873
+                    startedAt: '2026-08-07T20:31:04.098Z'
+                    completedAt: '2026-08-07T20:31:05.518Z'
+                    elapsedMs: 1420
+                    errorMessage: null
+                    timeline:
+                      - sequence: 1
+                        kind: HTTP
+                        label: POST /api/orders
+                        occurredAt: '2026-08-07T20:31:04.120Z'
+                        detail:
+                          statusCode: 201
+                      - sequence: 2
+                        kind: EVENT
+                        label: OrderCreated
+                        occurredAt: '2026-08-07T20:31:04.184Z'
+                        detail:
+                          phase: published
+                          topic: orders.events
+                          partition: 0
+                          offset: 4471
+                          eventId: 8d2c1a90-4e7b-4c3d-9f11-2a63b8d4e501
+                          correlationId: d89512f7-b544-4170-b66b-2e93f475ea8f
+                          aggregateId: order-21873
+                          producer: order-service
+                      - sequence: 3
+                        kind: EVENT
+                        label: OrderCreated
+                        occurredAt: '2026-08-07T20:31:04.219Z'
+                        detail:
+                          phase: consumed
+                          topic: orders.events
+                          partition: 0
+                          offset: 4471
+                          eventId: 8d2c1a90-4e7b-4c3d-9f11-2a63b8d4e501
+                          consumer: inventory-service
+                          durationMs: 12
+                          retryCount: 0
+                      - sequence: 4
+                        kind: EVENT
+                        label: InventoryReserved
+                        occurredAt: '2026-08-07T20:31:04.251Z'
+                        detail:
+                          phase: published
+                          topic: inventory.events
+                          eventId: 2b5f0a4e-1c8d-4f2a-9b77-8a41c2f9e6aa
+                          producer: inventory-service
+                      - sequence: 5
+                        kind: STATE_CHANGE
+                        label: Order FULFILLED
+                        occurredAt: '2026-08-07T20:31:04.447Z'
+                        detail:
+                          orderId: order-21873
+                          status: FULFILLED
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /demo/scenario-runs/{runId}/stream:
+    get:
+      tags: [scenarios]
+      operationId: streamScenarioRun
+      summary: Server-Sent Events stream of a run's progress
+      description: |
+        Long-lived `text/event-stream` connection, consumed with the browser's native `EventSource`
+        (`docs/planning/frontend-design.md`'s Live Frontend Updates section), so the run detail page
+        fills in as the run happens rather than after it finishes.
+
+        Emits `timeline-entry` for each new timeline entry and `run-status` when the run's status
+        changes, then closes once the run reaches `COMPLETED` or `FAILED`. A periodic `keep-alive`
+        comment keeps intermediaries from closing an idle connection.
+
+        **The per-message JSON schema is intentionally not frozen here.** Phase 0 freezes the endpoint,
+        its content type, and its event names; message schemas land in Phase 2 alongside
+        `docs/events/schemas/*.json` (`docs/planning/execution-plan.md` §7).
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: Stream opened.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /demo/reset:
+    post:
+      tags: [demo-admin]
+      operationId: resetDemoEnvironment
+      summary: Restore the demo environment to its seeded starting point
+      description: |
+        Restores seed inventory quantities, resumes any listener a scenario left paused, and clears
+        Payment Service's behavior override. Provided so any scenario can be re-run from a known
+        state, and so a half-finished run cannot leave a paused consumer or a rejecting simulator
+        behind to break the next one (`docs/scenarios.md`).
+
+        Whether historical orders and scenario runs are also deleted is a Phase 4/5 implementation
+        decision, not frozen here — the run history is part of the demo's evidence trail. The response
+        reports what was actually reset.
+
+        `409` while any run is still `RUNNING`: resetting underneath a live scenario would produce
+        results that describe nothing.
+      responses:
+        '200':
+          description: Environment reset.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResetResult'
+              examples:
+                reset:
+                  value:
+                    inventoryRestored: true
+                    consumersResumed:
+                      - inventory-service/order-created
+                    paymentBehaviorCleared: true
+                    resetAt: '2026-08-07T20:40:00.000Z'
+        '409':
+          description: A scenario run is still in progress.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  securitySchemes:
+    demoToken:
+      type: apiKey
+      in: header
+      name: X-Demo-Token
+      description: |
+        Optional and **disabled by default**. Declared so a deployment that exposes these endpoints
+        publicly can require a shared demo token without a contract change
+        (`docs/planning/high-level-design.md`'s Security Scope section). No `security` requirement is
+        applied to any operation in v1.
+
+  parameters:
+    RunId:
+      name: runId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: run-193
+
+  schemas:
+    ScenarioName:
+      type: string
+      description: |
+        The eight scenarios from `docs/planning/frontend-design.md`'s Required Demo Scenarios section,
+        using the endpoint names frozen in `docs/planning/backend-design.md` 4.6. Full definitions in
+        `docs/scenarios.md`.
+      enum:
+        - standard-order
+        - out-of-stock
+        - payment-failure
+        - duplicate-event
+        - consumer-outage
+        - poison-message
+        - inventory-contention
+        - high-volume
+
+    ScenarioRunStatus:
+      type: string
+      description: |
+        `FAILED` means the **scenario harness** failed — a service was unreachable, or a step could
+        not be carried out. A scenario whose subject fails as designed (Scenario 2's rejection,
+        Scenario 6's dead-lettered record) is `COMPLETED`: it demonstrated what it advertised.
+      enum: [RUNNING, COMPLETED, FAILED]
+
+    ScenarioDefinition:
+      type: object
+      required: [name, title, description, demonstrates, available]
+      properties:
+        name:
+          $ref: '#/components/schemas/ScenarioName'
+        title:
+          type: string
+          examples: [Standard Fulfillment]
+        description:
+          type: string
+          description: Plain-English behavior, for the scenario card.
+        demonstrates:
+          type: array
+          description: Engineering concepts this scenario exercises.
+          items:
+            type: string
+        expectedTerminalStatus:
+          type: [string, 'null']
+          description: |
+            Expected terminal order status where the scenario has a single subject order — one of the
+            values in `docs/order-state-machine.md`. `null` for scenarios judged by an invariant
+            rather than by one order's outcome (duplicate delivery, consumer outage, poison message,
+            contention, high volume).
+        available:
+          type: boolean
+          description: |
+            `false` for a scenario not yet implemented in the running build, so the UI can show it
+            without offering a button that does nothing. High-volume lands in Phase 10
+            (`docs/scenarios.md`).
+
+    ScenarioRun:
+      type: object
+      required: [id, scenarioName, status, correlationId, startedAt, timeline]
+      properties:
+        id:
+          type: string
+          examples: [run-193]
+        scenarioName:
+          $ref: '#/components/schemas/ScenarioName'
+        status:
+          $ref: '#/components/schemas/ScenarioRunStatus'
+        correlationId:
+          type: string
+          format: uuid
+          description: |
+            Shared by every event this run causes, so the run's activity can be traced across all
+            four services (`docs/events/event-catalog.md`).
+        orderId:
+          type: [string, 'null']
+          description: |
+            The run's primary order, once created. `null` before creation, and for runs that create
+            several orders (contention, high volume) or none (poison message) — those name their
+            orders in timeline entries instead.
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: [string, 'null']
+          format: date-time
+        elapsedMs:
+          type: [integer, 'null']
+          description: Wall-clock duration once finished; `null` while `RUNNING`.
+        errorMessage:
+          type: [string, 'null']
+          description: Set only when `status` is `FAILED`.
+        timeline:
+          type: array
+          description: Entries in occurrence order. Empty at the moment a run starts.
+          items:
+            $ref: '#/components/schemas/ScenarioTimelineEntry'
+
+    ScenarioTimelineEntry:
+      type: object
+      required: [sequence, kind, label, occurredAt]
+      properties:
+        sequence:
+          type: integer
+          minimum: 1
+        kind:
+          type: string
+          description: |
+            `HTTP` for a request the harness issued, `EVENT` for a Kafka record published or consumed,
+            `STATE_CHANGE` for an observed order status transition.
+          enum: [HTTP, EVENT, STATE_CHANGE]
+        label:
+          type: string
+          description: |
+            Display label. For `EVENT` entries this is the `eventType` from
+            `docs/events/event-catalog.md`.
+          examples: [OrderCreated]
+        occurredAt:
+          type: string
+          format: date-time
+        detail:
+          type: [object, 'null']
+          description: |
+            Metadata for the expandable row in `docs/planning/frontend-design.md`'s Scenario Run
+            Detail page: `phase` (`published`/`consumed`), `topic`, `partition`, `offset`, `eventId`,
+            `correlationId`, `aggregateId`, `producer`, `consumer`, `durationMs`, `retryCount`,
+            `statusCode`, `orderId`, `status`, `error`.
+
+            Deliberately an open object, and every field inside it is optional. That page's rule is
+            "Do not fabricate these fields. Display only values actually available from the system" —
+            so a field the runtime does not know is **absent**, not zero or empty. A frozen schema
+            with required keys would force exactly the fabrication the design forbids.
+          additionalProperties: true
+
+    ScenarioRunSummary:
+      type: object
+      description: A run without its timeline.
+      required: [id, scenarioName, status, correlationId, startedAt]
+      properties:
+        id:
+          type: string
+        scenarioName:
+          $ref: '#/components/schemas/ScenarioName'
+        status:
+          $ref: '#/components/schemas/ScenarioRunStatus'
+        correlationId:
+          type: string
+          format: uuid
+        orderId:
+          type: [string, 'null']
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: [string, 'null']
+          format: date-time
+        elapsedMs:
+          type: [integer, 'null']
+
+    ScenarioRunPage:
+      type: object
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScenarioRunSummary'
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+        totalPages:
+          type: integer
+
+    ResetResult:
+      type: object
+      required: [inventoryRestored, consumersResumed, paymentBehaviorCleared, resetAt]
+      properties:
+        inventoryRestored:
+          type: boolean
+        consumersResumed:
+          type: array
+          description: Listeners that were paused and have been resumed, as `service/listener`.
+          items:
+            type: string
+        paymentBehaviorCleared:
+          type: boolean
+        resetAt:
+          type: string
+          format: date-time
+
+    ApiError:
+      type: object
+      description: |
+        Shared error shape from `docs/planning/high-level-design.md`'s API Error Model section.
+      required: [timestamp, status, error, code, message, path]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+        error:
+          type: string
+        code:
+          type: string
+          description: |
+            Scenario Service uses: `VALIDATION_ERROR`, `SCENARIO_NOT_FOUND`, `SCENARIO_RUN_NOT_FOUND`,
+            `SCENARIO_ALREADY_RUNNING`, `SCENARIO_UNAVAILABLE`, `RESET_CONFLICT`, `DEMO_DISABLED`,
+            `INTERNAL_ERROR`.
+        message:
+          type: string
+        path:
+          type: string
+        correlationId:
+          type: [string, 'null']
+          format: uuid
+
+  responses:
+    BadRequest:
+      description: Request validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    NotFound:
+      description: Unknown scenario name or run id.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          examples:
+            runNotFound:
+              value:
+                timestamp: '2026-08-07T20:31:04.220Z'
+                status: 404
+                error: Not Found
+                code: SCENARIO_RUN_NOT_FOUND
+                message: No scenario run with id run-000
+                path: /demo/scenario-runs/run-000
+                correlationId: d89512f7-b544-4170-b66b-2e93f475ea8f
+    InternalError:
+      description: Unexpected server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'

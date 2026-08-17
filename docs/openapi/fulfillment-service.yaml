@@ -1,0 +1,246 @@
+openapi: 3.1.0
+
+info:
+  title: Fulfillment Service API
+  version: 1.0.0
+  description: |
+    Public REST surface of the Fulfillment Service. Shipments are created in the event path — this
+    service consumes `PaymentAuthorized` and publishes `ShipmentCreated`
+    (`docs/events/event-catalog.md`) — so the `/api` surface here is read-only, matching
+    `docs/planning/backend-design.md` 4.4's "expose fulfillment status if useful".
+
+    No carrier integration exists; tracking numbers are generated locally
+    (`docs/planning/project-overview.md`'s Explicit Non-Goals section).
+
+    **Frozen by Phase 0.** Changes must follow the coordination protocol in
+    `docs/planning/agent-guidance.md`'s Agent Coordination Rules section.
+
+    **Two namespaces, never mixed** (`docs/planning/agent-guidance.md` rule 9):
+      - `/api` — read shipment records
+      - `/demo` — consumer control; used only by Scenario Service
+
+    **Health and metrics** come from Spring Boot Actuator and are outside this document.
+
+servers:
+  - url: http://localhost:8084
+    description: Local development
+
+tags:
+  - name: shipments
+    description: Read-only view of shipment records.
+  - name: demo
+    description: |
+      Demo-only consumer control, identical in shape to Inventory Service's. Isolated from `/api` by
+      construction; may be disabled or protected by a simple demo configuration
+      (`docs/planning/high-level-design.md`'s Security Scope section).
+
+paths:
+  /api/shipments/{orderId}:
+    get:
+      tags: [shipments]
+      operationId: getShipmentByOrderId
+      summary: Get the shipment for an order
+      description: |
+        `404` until `PaymentAuthorized` has been consumed and a shipment created. For an order that
+        never reaches `PAID` — Scenario 2 or Scenario 3 — no shipment is ever created and `404` is the
+        permanent, correct answer.
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: order-21873
+      responses:
+        '200':
+          description: The shipment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Shipment'
+              examples:
+                created:
+                  value:
+                    id: shp-1180
+                    orderId: order-21873
+                    status: CREATED
+                    trackingNumber: TRK-000001180
+                    createdAt: '2026-08-07T20:31:04.418Z'
+                    updatedAt: '2026-08-07T20:31:04.418Z'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /demo/consumers:
+    get:
+      tags: [demo]
+      operationId: listConsumers
+      summary: List this service's Kafka listeners and whether each is paused
+      responses:
+        '200':
+          description: Listener states.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConsumerState'
+              examples:
+                idle:
+                  value:
+                    - name: payment-authorized
+                      topic: payments.events
+                      groupId: fulfillment-service
+                      paused: false
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /demo/consumers/{consumerName}/pause:
+    post:
+      tags: [demo]
+      operationId: pauseConsumer
+      summary: Pause a Kafka listener
+      description: |
+        Pauses the named Spring Kafka listener container. A genuine pause: records accumulate on the
+        topic and are processed from the committed offset on resume. Idempotent.
+      parameters:
+        - $ref: '#/components/parameters/ConsumerName'
+      responses:
+        '200':
+          description: Listener paused.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsumerState'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /demo/consumers/{consumerName}/resume:
+    post:
+      tags: [demo]
+      operationId: resumeConsumer
+      summary: Resume a paused Kafka listener
+      parameters:
+        - $ref: '#/components/parameters/ConsumerName'
+      responses:
+        '200':
+          description: Listener resumed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsumerState'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  parameters:
+    ConsumerName:
+      name: consumerName
+      in: path
+      required: true
+      description: Logical listener name as reported by `GET /demo/consumers`.
+      schema:
+        type: string
+      example: payment-authorized
+
+  schemas:
+    ShipmentStatus:
+      type: string
+      description: |
+        Local shipment status. Only one value exists in v1: a shipment is created and the order
+        becomes `FULFILLED`. `OrderShipped` and a matching `SHIPPED` status were deliberately excluded
+        from v1 (`docs/events/event-catalog.md` §4).
+      enum: [CREATED]
+
+    Shipment:
+      type: object
+      required: [id, orderId, status, trackingNumber, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          examples: [shp-1180]
+        orderId:
+          type: string
+          description: |
+            Unique across shipments — a duplicate `PaymentAuthorized` delivery cannot produce a second
+            shipment, which is part of Scenario 4's success condition (`docs/scenarios.md`).
+        status:
+          $ref: '#/components/schemas/ShipmentStatus'
+        trackingNumber:
+          type: string
+          description: Locally generated. No carrier is contacted.
+          examples: [TRK-000001180]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ConsumerState:
+      type: object
+      required: [name, topic, groupId, paused]
+      properties:
+        name:
+          type: string
+        topic:
+          type: string
+        groupId:
+          type: string
+        paused:
+          type: boolean
+
+    ApiError:
+      type: object
+      description: |
+        Shared error shape from `docs/planning/high-level-design.md`'s API Error Model section.
+      required: [timestamp, status, error, code, message, path]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+        error:
+          type: string
+        code:
+          type: string
+          description: |
+            Fulfillment Service uses: `SHIPMENT_NOT_FOUND`, `CONSUMER_NOT_FOUND`, `DEMO_DISABLED`,
+            `INTERNAL_ERROR`.
+        message:
+          type: string
+        path:
+          type: string
+        correlationId:
+          type: [string, 'null']
+          format: uuid
+
+  responses:
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          examples:
+            shipmentNotFound:
+              value:
+                timestamp: '2026-08-07T20:31:04.220Z'
+                status: 404
+                error: Not Found
+                code: SHIPMENT_NOT_FOUND
+                message: No shipment for order order-00000
+                path: /api/shipments/order-00000
+                correlationId: d89512f7-b544-4170-b66b-2e93f475ea8f
+    InternalError:
+      description: Unexpected server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
