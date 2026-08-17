@@ -1,0 +1,288 @@
+openapi: 3.1.0
+
+info:
+  title: Payment Service API
+  version: 1.0.0
+  description: |
+    Public REST surface of the Payment Service — a **simulator**. No real payment provider is
+    involved, no card data exists, and no money moves
+    (`docs/planning/backend-design.md` 4.3, `docs/planning/project-overview.md`'s Explicit Non-Goals
+    section).
+
+    **Frozen by Phase 0.** Changes must follow the coordination protocol in
+    `docs/planning/agent-guidance.md`'s Agent Coordination Rules section.
+
+    Authorization happens in the event path, not over HTTP: this service consumes `PaymentRequested`
+    and publishes `PaymentAuthorized` or `PaymentRejected` (`docs/events/event-catalog.md`). The `/api`
+    endpoint below is read-only, and `/demo` controls what the simulator decides.
+
+    **Two namespaces, never mixed** (`docs/planning/agent-guidance.md` rule 9):
+      - `/api` — read payment attempt outcomes
+      - `/demo` — configure simulator behavior; used only by Scenario Service
+
+    **Health and metrics** come from Spring Boot Actuator and are outside this document.
+
+servers:
+  - url: http://localhost:8083
+    description: Local development
+
+tags:
+  - name: payments
+    description: Read-only view of simulated authorization attempts.
+  - name: demo
+    description: |
+      Demo-only simulator control. Isolated from `/api` by construction. May be disabled or protected
+      by a simple demo configuration (`docs/planning/high-level-design.md`'s Security Scope section).
+
+paths:
+  /api/payments/{orderId}:
+    get:
+      tags: [payments]
+      operationId: getPaymentByOrderId
+      summary: Get the payment attempt for an order
+      description: |
+        Returns the attempt recorded for this order, whatever its outcome. `404` while no
+        `PaymentRequested` has been consumed yet — which is the normal state for an order still in
+        `PENDING` or `INVENTORY_RESERVED`, and is not an error condition for a caller polling for the
+        result.
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: order-21873
+      responses:
+        '200':
+          description: The payment attempt.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentAttempt'
+              examples:
+                authorized:
+                  value:
+                    id: pay-9932
+                    orderId: order-21873
+                    status: AUTHORIZED
+                    amount: 258.00
+                    failureReason: null
+                    idempotencyKey: 3f1a8c02-5f8e-4a2b-9d77-0b41c2f9e6aa
+                    createdAt: '2026-08-07T20:31:04.301Z'
+                    updatedAt: '2026-08-07T20:31:04.361Z'
+                rejected:
+                  value:
+                    id: pay-9933
+                    orderId: order-21874
+                    status: REJECTED
+                    amount: 129.00
+                    failureReason: CARD_DECLINED
+                    idempotencyKey: 5c2b7d13-6a9f-4b3c-8e88-1c52d3a0f7bb
+                    createdAt: '2026-08-07T20:32:10.114Z'
+                    updatedAt: '2026-08-07T20:32:10.131Z'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /demo/payment-behavior:
+    get:
+      tags: [demo]
+      operationId: getPaymentBehavior
+      summary: Read the simulator's current behavior override
+      responses:
+        '200':
+          description: Current behavior.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentBehavior'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      tags: [demo]
+      operationId: setPaymentBehavior
+      summary: Configure how the simulator responds to the next payment requests
+      description: |
+        Sets the simulator's behavior, covering the three modes named in
+        `docs/planning/backend-design.md` 4.3: default success, reject a request, and raise a
+        retryable simulated provider error.
+
+        **Scoping.** With `orderId` set, the override applies only to that order and every other order
+        authorizes normally. With `orderId` omitted, it applies to **all** payment requests until
+        changed or reset — which is what Scenario 3 uses, because the scenario must arm the rejection
+        before `POST /api/orders` has told it the order id. In a single-reviewer demo that is
+        deterministic; a concurrently created order during that window would also be rejected.
+
+        The override survives until replaced, deleted, or cleared by Scenario Service's
+        `POST /demo/reset`. It is held in memory and does not survive a restart.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentBehavior'
+            examples:
+              rejectEverything:
+                summary: Arm a rejection for the next order (Scenario 3)
+                value:
+                  mode: REJECT
+                  failureReason: CARD_DECLINED
+              rejectOneOrder:
+                summary: Reject a known order only
+                value:
+                  mode: REJECT
+                  orderId: order-21874
+                  failureReason: INSUFFICIENT_FUNDS
+              retryableProviderError:
+                summary: Raise a retryable error so retries and DLQ routing are exercised
+                value:
+                  mode: RETRYABLE_ERROR
+      responses:
+        '200':
+          description: Behavior applied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentBehavior'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [demo]
+      operationId: clearPaymentBehavior
+      summary: Clear the override, returning the simulator to default success
+      responses:
+        '204':
+          description: Override cleared.
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  schemas:
+    PaymentAttemptStatus:
+      type: string
+      description: |
+        Local status of a simulated attempt. Distinct from order status
+        (`docs/order-state-machine.md`), which only Order Service owns.
+      enum: [PENDING, AUTHORIZED, REJECTED]
+
+    PaymentFailureReason:
+      type: string
+      enum: [CARD_DECLINED, INSUFFICIENT_FUNDS]
+
+    PaymentAttempt:
+      type: object
+      required: [id, orderId, status, amount, idempotencyKey, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          examples: [pay-9932]
+        orderId:
+          type: string
+        status:
+          $ref: '#/components/schemas/PaymentAttemptStatus'
+        amount:
+          type: number
+          multipleOf: 0.01
+          description: Amount from the `PaymentRequested` payload. Single implicit currency.
+        failureReason:
+          oneOf:
+            - $ref: '#/components/schemas/PaymentFailureReason'
+            - type: 'null'
+          description: Set only when `status` is `REJECTED`.
+        idempotencyKey:
+          type: string
+          format: uuid
+          description: |
+            The `eventId` of the `PaymentRequested` event that created this attempt. Unique per
+            attempt, so a redelivered request maps back to this row instead of authorizing twice
+            (`docs/db-ownership.md`).
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PaymentBehavior:
+      type: object
+      additionalProperties: false
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          description: |
+            - `DEFAULT_SUCCESS` — authorize every request. The startup default.
+            - `REJECT` — publish `PaymentRejected` instead of authorizing. A business rejection: the
+              order ends `PAYMENT_FAILED` and Inventory Service releases its reservation.
+            - `RETRYABLE_ERROR` — raise a simulated transient provider error inside the consumer. This
+              is **not** a rejection: it triggers bounded retries with backoff and lands in
+              `payments.dlq` if attempts are exhausted, leaving the order in `PAYMENT_PENDING`
+              (`docs/events/event-catalog.md`, `PaymentRejected`).
+          enum: [DEFAULT_SUCCESS, REJECT, RETRYABLE_ERROR]
+        orderId:
+          type: [string, 'null']
+          description: Restrict the override to one order. Omit or `null` to apply it to all requests.
+        failureReason:
+          oneOf:
+            - $ref: '#/components/schemas/PaymentFailureReason'
+            - type: 'null'
+          description: Reason to report with `REJECT`. Defaults to `CARD_DECLINED` when omitted.
+
+    ApiError:
+      type: object
+      description: |
+        Shared error shape from `docs/planning/high-level-design.md`'s API Error Model section.
+      required: [timestamp, status, error, code, message, path]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+        error:
+          type: string
+        code:
+          type: string
+          description: |
+            Payment Service uses: `VALIDATION_ERROR`, `PAYMENT_NOT_FOUND`, `DEMO_DISABLED`,
+            `INTERNAL_ERROR`.
+        message:
+          type: string
+        path:
+          type: string
+        correlationId:
+          type: [string, 'null']
+          format: uuid
+
+  responses:
+    BadRequest:
+      description: Request validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    NotFound:
+      description: No payment attempt for that order.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          examples:
+            paymentNotFound:
+              value:
+                timestamp: '2026-08-07T20:31:04.220Z'
+                status: 404
+                error: Not Found
+                code: PAYMENT_NOT_FOUND
+                message: No payment attempt for order order-00000
+                path: /api/payments/order-00000
+                correlationId: d89512f7-b544-4170-b66b-2e93f475ea8f
+    InternalError:
+      description: Unexpected server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
