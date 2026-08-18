@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: inventory-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/orderfulfillment
+    username: orderfulfillment
+    password: orderfulfillment
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    schemas: inventory_service
+    # Phase 3 simplification: see order-service/src/main/resources/application.yml's comment and
+    # docs/agent-reports/phase-3-boundary.md.
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: inventory-service
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+    listener:
+      # One consumer thread per partition (KafkaTopicConfig creates every topic with 3). Without
+      # this Spring Kafka defaults to concurrency=1, so a single instance processes every partition
+      # on one thread and two OrderCreated events for the same scarce SKU can never actually
+      # contend inside this JVM — which would silently mask the optimistic-locking race that
+      # Scenario 7 (Inventory Contention) exists to demonstrate, and that real horizontal scaling
+      # (several inventory-service instances in the same consumer group) would produce anyway.
+      concurrency: 3
+
+server:
+  port: 8082
+
+logging:
+  level:
+    com.orderfulfillment: INFO

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://order-fulfillment-lab.example/events/InventoryReservationFailed.schema.json",
+  "title": "InventoryReservationFailed payload",
+  "description": "docs/events/event-catalog.md §3 — InventoryReservationFailed. Published by Inventory Service on inventory.events, consumed by Order Service. This schema covers only the envelope's `payload` field, not the envelope itself.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["orderId", "reason", "shortages"],
+  "properties": {
+    "orderId": { "type": "string" },
+    "reason": { "type": "string", "enum": ["INSUFFICIENT_STOCK", "UNKNOWN_SKU"] },
+    "shortages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["sku", "requested", "available"],
+        "properties": {
+          "sku": { "type": "string" },
+          "requested": { "type": "integer" },
+          "available": { "type": "integer" }
+        }
+      }
+    }
+  }
+}

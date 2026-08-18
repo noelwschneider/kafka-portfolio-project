@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { getOrder } from '../api/orders';
+import { getOrder, type OrderDetail } from '../api/orders';
 import { StatusBadge } from '../components/StatusBadge';
 
 interface Props {
@@ -7,14 +7,28 @@ interface Props {
   onBack: () => void;
 }
 
+// docs/order-state-machine.md §1 — terminal states. Kept in sync manually since the frontend has
+// no generated client from the frozen OpenAPI/state-machine docs this phase.
+const TERMINAL_STATUSES = new Set([
+  'REJECTED_OUT_OF_STOCK',
+  'PAYMENT_FAILED',
+  'FULFILLED',
+  'FAILED',
+]);
+
 export function OrderDetailPage({ orderId, onBack }: Props) {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['order', orderId],
     queryFn: () => getOrder(orderId),
-    // the whole workflow runs synchronously this phase (no Kafka yet), so the order is already in
-    // its final state by the time this page loads — a short poll just covers a page left open
-    // across a manual PUT /demo/payment-behavior + retry during a demo.
-    refetchInterval: 4000,
+    // Phase 2: the order now travels through Kafka asynchronously after POST /api/orders returns
+    // PENDING, so this poll is what actually surfaces the state transitions to the user — not just
+    // a demo-recovery convenience like it was in Phase 1. Polls at 1s while non-terminal, then
+    // stops once the order reaches a terminal state (docs/order-state-machine.md §1). SSE
+    // (GET /api/orders/stream) replaces this in Phase 5; not implemented yet.
+    refetchInterval: (query) => {
+      const status = (query.state.data as OrderDetail | undefined)?.status;
+      return status && TERMINAL_STATUSES.has(status) ? false : 1000;
+    },
   });
 
   return (

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://order-fulfillment-lab.example/events/ShipmentCreated.schema.json",
+  "title": "ShipmentCreated payload",
+  "description": "docs/events/event-catalog.md §3 — ShipmentCreated. Published by Fulfillment Service on fulfillment.events, consumed by Order Service. This schema covers only the envelope's `payload` field, not the envelope itself.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["orderId", "shipmentId", "trackingNumber", "createdAt"],
+  "properties": {
+    "orderId": { "type": "string" },
+    "shipmentId": { "type": "string" },
+    "trackingNumber": { "type": "string" },
+    "createdAt": { "type": "string", "format": "date-time" }
+  }
+}

@@ -1,4 +1,4 @@
-import { apiFetch } from './client';
+import { apiFetch, INVENTORY_SERVICE_BASE_URL } from './client';
 
 // Mirrors docs/openapi/inventory-service.yaml's InventoryItem — used only to populate the SKU
 // picker on the create-order form with real stock, not a fabricated catalog.
@@ -12,5 +12,5 @@ export interface InventoryItem {
 }
 
 export function listInventory(): Promise<InventoryItem[]> {
-  return apiFetch<InventoryItem[]>('/api/inventory');
+  return apiFetch<InventoryItem[]>(INVENTORY_SERVICE_BASE_URL, '/api/inventory');
 }

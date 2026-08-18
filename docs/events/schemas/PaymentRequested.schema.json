@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://order-fulfillment-lab.example/events/PaymentRequested.schema.json",
+  "title": "PaymentRequested payload",
+  "description": "docs/events/event-catalog.md §3 — PaymentRequested. Published by Order Service (not Payment Service — deliberate, see the catalog's §2 topic-ownership rationale) on orders.events, consumed by Payment Service. This schema covers only the envelope's `payload` field, not the envelope itself.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["orderId", "amount", "idempotencyKey"],
+  "properties": {
+    "orderId": { "type": "string" },
+    "amount": { "type": "number", "multipleOf": 0.01, "exclusiveMinimum": 0 },
+    "idempotencyKey": {
+      "type": "string",
+      "format": "uuid",
+      "description": "The eventId of this PaymentRequested event, per event-catalog.md §3."
+    }
+  }
+}

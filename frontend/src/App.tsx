@@ -16,7 +16,7 @@ function App() {
       <div className="app">
         <header className="app-header">
           <h1 onClick={() => setView({ name: 'list' })}>Order Fulfillment Systems Lab</h1>
-          <p className="app-subtitle">Phase 1 — modular monolith, synchronous workflow</p>
+          <p className="app-subtitle">Phase 3 — four independent services, Kafka-driven workflow</p>
         </header>
 
         <main>

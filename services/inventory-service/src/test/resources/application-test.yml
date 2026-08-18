@@ -1,0 +1,12 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    schemas: inventory_service
+  datasource:
+    hikari:
+      # Concurrency tests fire more simultaneous reservation threads than the default pool of 10;
+      # without this the barrier would be defeated by threads queueing for a connection instead of
+      # racing for the row.
+      maximum-pool-size: 30

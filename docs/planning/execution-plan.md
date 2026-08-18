@@ -169,9 +169,9 @@ This catches the common failure mode where an implementing agent's summary says 
 - Spring Boot 4.x (bumped from the original 3.x pin during Phase 1 — see `docs/agent-reports/phase-1.md` §1a for the migration notes: entity-manager-factory post-processor package move, `TestRestTemplate` → `RestTestClient`)
 - Spring Web (REST)
 - Spring Data JPA / Hibernate
-- Spring for Apache Kafka (`spring-kafka`)
+- Spring for Apache Kafka (`spring-kafka`; under Boot 4's modularized autoconfiguration the Maven coordinate to actually depend on is `spring-boot-starter-kafka`, not the bare `spring-kafka` artifact — same package-split reasoning as the Spring Boot 3→4 line above, see `docs/agent-reports/phase-2.md` §3.2)
 - Spring Security (only if/when auth is added — see high-level-design.md's Security Scope section, not in v1)
-- Flyway (migrations)
+- Flyway (migrations; under Boot 4's modularized autoconfiguration, `flyway-core` + `flyway-database-postgresql` alone do not activate Spring Boot's Flyway autoconfiguration — the Boot-4-appropriate module is `org.springframework.boot:spring-boot-flyway`, same pattern as the Spring Boot 3→4 and Kafka-starter lines above, see `docs/agent-reports/phase-3-boundary.md` §3)
 - Maven (multi-module build)
 - Bean Validation (`jakarta.validation`)
 - JUnit 5

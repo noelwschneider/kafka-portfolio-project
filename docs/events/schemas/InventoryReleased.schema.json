@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://order-fulfillment-lab.example/events/InventoryReleased.schema.json",
+  "title": "InventoryReleased payload",
+  "description": "docs/events/event-catalog.md §3 — InventoryReleased. Published by Inventory Service on inventory.events; no consumer in v1. This schema covers only the envelope's `payload` field, not the envelope itself. Added alongside the 7 schemas the Phase 2 prompt named explicitly, for completeness against the full 8-event catalog — see docs/agent-reports/phase-2.md.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["orderId", "reservationId", "items", "reason", "releasedAt"],
+  "properties": {
+    "orderId": { "type": "string" },
+    "reservationId": { "type": "string" },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["sku", "quantity"],
+        "properties": {
+          "sku": { "type": "string" },
+          "quantity": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "reason": { "type": "string", "enum": ["PAYMENT_REJECTED"] },
+    "releasedAt": { "type": "string", "format": "date-time" }
+  }
+}

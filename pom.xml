@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.0</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.orderfulfillment</groupId>
+    <artifactId>order-fulfillment-systems-lab</artifactId>
+    <version>0.1.0</version>
+    <packaging>pom</packaging>
+    <name>order-fulfillment-systems-lab</name>
+    <description>
+        Order Fulfillment Systems Lab - root aggregator (Phase 3: the monolith dissolved into four
+        independently buildable/runnable Spring Boot services plus one shared library module).
+    </description>
+
+    <properties>
+        <java.version>21</java.version>
+    </properties>
+
+    <modules>
+        <module>services/common</module>
+        <module>services/order-service</module>
+        <module>services/inventory-service</module>
+        <module>services/payment-service</module>
+        <module>services/fulfillment-service</module>
+    </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Every service's own pom also declares this dependency directly (Maven does not
+                 propagate dependencyManagement's "import" entries transitively through more than
+                 one parent hop reliably across all tooling), but centralizing the version here
+                 keeps the four services' Testcontainers versions from drifting independently. -->
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-bom</artifactId>
+                <version>1.21.4</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://order-fulfillment-lab.example/events/PaymentAuthorized.schema.json",
+  "title": "PaymentAuthorized payload",
+  "description": "docs/events/event-catalog.md §3 — PaymentAuthorized. Published by Payment Service on payments.events. Fanned out to two independent consumers (Order Service, Fulfillment Service). This schema covers only the envelope's `payload` field, not the envelope itself.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["orderId", "paymentAttemptId", "amount", "authorizedAt"],
+  "properties": {
+    "orderId": { "type": "string" },
+    "paymentAttemptId": { "type": "string" },
+    "amount": { "type": "number", "multipleOf": 0.01, "exclusiveMinimum": 0 },
+    "authorizedAt": { "type": "string", "format": "date-time" }
+  }
+}

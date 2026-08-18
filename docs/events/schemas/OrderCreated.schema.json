@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://order-fulfillment-lab.example/events/OrderCreated.schema.json",
+  "title": "OrderCreated payload",
+  "description": "docs/events/event-catalog.md §3 — OrderCreated. Published by Order Service on orders.events, consumed by Inventory Service. This schema covers only the envelope's `payload` field, not the envelope itself.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["orderId", "customerId", "items"],
+  "properties": {
+    "orderId": { "type": "string" },
+    "customerId": { "type": "string" },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["sku", "quantity"],
+        "properties": {
+          "sku": { "type": "string" },
+          "quantity": { "type": "integer", "minimum": 1 }
+        }
+      }
+    }
+  }
+}

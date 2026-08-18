@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://order-fulfillment-lab.example/events/PaymentRejected.schema.json",
+  "title": "PaymentRejected payload",
+  "description": "docs/events/event-catalog.md §3 — PaymentRejected. Published by Payment Service on payments.events, consumed by Order Service and Inventory Service (compensation trigger). This schema covers only the envelope's `payload` field, not the envelope itself.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["orderId", "paymentAttemptId", "amount", "failureReason", "rejectedAt"],
+  "properties": {
+    "orderId": { "type": "string" },
+    "paymentAttemptId": { "type": "string" },
+    "amount": { "type": "number", "multipleOf": 0.01, "exclusiveMinimum": 0 },
+    "failureReason": { "type": "string", "enum": ["CARD_DECLINED", "INSUFFICIENT_FUNDS"] },
+    "rejectedAt": { "type": "string", "format": "date-time" }
+  }
+}

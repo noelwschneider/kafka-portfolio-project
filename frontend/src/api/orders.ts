@@ -1,4 +1,4 @@
-import { apiFetch } from './client';
+import { apiFetch, ORDER_SERVICE_BASE_URL } from './client';
 
 // Mirrors docs/openapi/order-service.yaml — the Order Service's frozen contract.
 
@@ -64,16 +64,16 @@ export interface OrderPage {
 }
 
 export function createOrder(request: CreateOrderRequest): Promise<OrderAccepted> {
-  return apiFetch<OrderAccepted>('/api/orders', {
+  return apiFetch<OrderAccepted>(ORDER_SERVICE_BASE_URL, '/api/orders', {
     method: 'POST',
     body: JSON.stringify(request),
   });
 }
 
 export function listOrders(): Promise<OrderPage> {
-  return apiFetch<OrderPage>('/api/orders?size=50');
+  return apiFetch<OrderPage>(ORDER_SERVICE_BASE_URL, '/api/orders?size=50');
 }
 
 export function getOrder(orderId: string): Promise<OrderDetail> {
-  return apiFetch<OrderDetail>(`/api/orders/${orderId}`);
+  return apiFetch<OrderDetail>(ORDER_SERVICE_BASE_URL, `/api/orders/${orderId}`);
 }

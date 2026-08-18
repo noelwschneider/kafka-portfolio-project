@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: order-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/orderfulfillment
+    username: orderfulfillment
+    password: orderfulfillment
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    # No default_schema: the entity's @Table(schema="order_service") is explicit, matching
+    # docs/db-ownership.md even though this JVM now only ever touches its own schema.
+  flyway:
+    schemas: order_service
+    # Phase 3 simplification: Spring Boot's ordinary built-in Flyway auto-configuration is enough
+    # now that each service's JVM only ever migrates its own schema — the Phase 1/2 multi-schema
+    # SchemaMigrationRunner existed only because one JVM drove four schemas at once. See
+    # docs/agent-reports/phase-3-boundary.md.
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: false # envelope versioning rule (event-catalog.md §5): consumers must ignore unknown fields
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: order-service # every @KafkaListener below overrides this with its own service-scoped group id
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+
+server:
+  port: 8081
+
+logging:
+  level:
+    com.orderfulfillment: INFO
