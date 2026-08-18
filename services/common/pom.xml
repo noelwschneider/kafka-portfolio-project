@@ -29,6 +29,14 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-kafka</artifactId>
         </dependency>
+        <!-- For the shared processed_events idempotency ledger (JdbcClient + @Transactional). JDBC
+             rather than JPA deliberately: the ledger's DDL is frozen and identical in every service's
+             schema, so keeping it as two SQL statements here avoids four near-identical entity +
+             repository pairs drifting apart during Phase 4's fan-out. See ProcessedEventLedger. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

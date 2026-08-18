@@ -140,6 +140,7 @@ available_quantity  integer NOT NULL CHECK (available_quantity >= 0)
 reserved_quantity   integer NOT NULL CHECK (reserved_quantity >= 0)
 version             bigint NOT NULL      -- JPA @Version, optimistic locking
 updated_at          timestamptz NOT NULL
+CHECK (reserved_quantity <= available_quantity)
 
 inventory_reservations
 ----------------------
@@ -152,6 +153,12 @@ created_at      timestamptz NOT NULL
 updated_at      timestamptz NOT NULL
 UNIQUE (order_id, sku)
 ```
+
+`CHECK (reserved_quantity <= available_quantity)` **states Scenario 7's invariant directly**, rather
+than leaving the two per-column checks to imply it — added in Phase 4 because a real application-level
+bug wrote `reserved_quantity = 4` against `available_quantity = 2` and the database accepted it
+(`docs/agent-reports/phase-3-inventory-concurrency.md` §4, §7.2; migration `V3__reserved_within_available.sql`;
+broadcast in `docs/CHANGELOG-contracts.md`).
 
 `available_quantity >= 0` as a database CHECK is deliberate: it is the last line of defence for
 Scenario 7's invariant ("total reserved inventory never exceeds available inventory") if the

@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.orderfulfillment.common.IdGenerator;
+import com.orderfulfillment.common.idempotency.ProcessedEventLedger;
 import com.orderfulfillment.payment.dto.PaymentBehaviorDto;
 import com.orderfulfillment.payment.dto.PaymentBehaviorMode;
 import java.math.BigDecimal;
@@ -25,7 +26,9 @@ class PaymentServiceTest {
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         behaviorStore = new PaymentBehaviorStore();
         IdGenerator idGenerator = new IdGenerator();
-        paymentService = new PaymentService(repository, behaviorStore, idGenerator);
+        // These unit tests exercise the no-event-key overload, which never touches the ledger.
+        ProcessedEventLedger processedEventLedger = mock(ProcessedEventLedger.class);
+        paymentService = new PaymentService(repository, behaviorStore, idGenerator, processedEventLedger);
     }
 
     @Test

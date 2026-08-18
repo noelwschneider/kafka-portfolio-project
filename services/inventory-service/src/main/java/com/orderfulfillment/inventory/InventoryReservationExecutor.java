@@ -1,6 +1,8 @@
 package com.orderfulfillment.inventory;
 
 import com.orderfulfillment.common.IdGenerator;
+import com.orderfulfillment.common.idempotency.ProcessedEventKey;
+import com.orderfulfillment.common.idempotency.ProcessedEventLedger;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -14,6 +16,14 @@ import org.springframework.transaction.annotation.Transactional;
  * Split out from InventoryService so its @Transactional(REQUIRES_NEW) methods go through Spring's
  * proxy — a self-invoked call (this.attemptReserve(...)) from within InventoryService would
  * silently skip the proxy and run without a transaction/retry boundary at all.
+ *
+ * <p>This class is also where the {@code processed_events} claim happens, and it has to be: ADR-005
+ * requires the ledger row and the business change to commit in <em>one</em> local transaction, and
+ * this method — not the listener, and not {@link InventoryService#reserve}'s retry loop around it —
+ * is that transaction. Claiming the event one level up would leave the row in an outer transaction
+ * that commits separately from the reservation it is supposed to be atomic with. Claiming it inside
+ * also makes the retry loop behave correctly for free: an attempt that loses the optimistic-lock
+ * race rolls back its ledger row along with everything else, so the next attempt starts clean.
  */
 @Component
 class InventoryReservationExecutor {
@@ -21,17 +31,29 @@ class InventoryReservationExecutor {
     private final InventoryItemRepository itemRepository;
     private final InventoryReservationRepository reservationRepository;
     private final IdGenerator idGenerator;
+    private final ProcessedEventLedger processedEventLedger;
 
     InventoryReservationExecutor(InventoryItemRepository itemRepository,
                                   InventoryReservationRepository reservationRepository,
-                                  IdGenerator idGenerator) {
+                                  IdGenerator idGenerator,
+                                  ProcessedEventLedger processedEventLedger) {
         this.itemRepository = itemRepository;
         this.reservationRepository = reservationRepository;
         this.idGenerator = idGenerator;
+        this.processedEventLedger = processedEventLedger;
     }
 
+    /**
+     * @param eventKey the event being applied, or {@code null} for a call that does not originate
+     *                 from a Kafka record (administrative and test callers) and so has nothing to
+     *                 deduplicate against
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    ReservationResult attemptReserve(String orderId, List<OrderLine> lines) {
+    ReservationResult attemptReserve(String orderId, List<OrderLine> lines, ProcessedEventKey eventKey) {
+        if (eventKey != null && !processedEventLedger.recordProcessed(eventKey)) {
+            return ReservationResult.DUPLICATE;
+        }
+
         // Lines are summed per SKU before anything is checked or written. An order carrying the
         // same SKU on two lines used to be checked line-by-line against the *unmutated* free
         // quantity, so 2 + 2 against a stock of 2 passed both checks and then applied both
@@ -83,8 +105,12 @@ class InventoryReservationExecutor {
         return ReservationResult.reserved(reservationId);
     }
 
+    /** @param eventKey as {@link #attemptReserve} — the PaymentRejected being applied, or null. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    ReleaseResult release(String orderId) {
+    ReleaseResult release(String orderId, ProcessedEventKey eventKey) {
+        if (eventKey != null && !processedEventLedger.recordProcessed(eventKey)) {
+            return ReleaseResult.DUPLICATE;
+        }
         List<InventoryReservationEntity> reservations =
                 reservationRepository.findByOrderIdAndStatus(orderId, ReservationStatus.RESERVED);
         if (reservations.isEmpty()) {

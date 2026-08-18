@@ -34,4 +34,30 @@ public class KafkaTopicConfig {
     public NewTopic fulfillmentEventsTopic() {
         return TopicBuilder.name(KafkaTopics.FULFILLMENT_EVENTS).partitions(PARTITIONS).replicas(REPLICATION_FACTOR).build();
     }
+
+    // The four dead-letter topics (docs/events/event-catalog.md §2). Declared here for the same
+    // reason as the domain topics: a DLQ that only exists because a broker auto-created it on first
+    // dead-letter would have broker-default partitioning, and Phase 4's whole point is that the
+    // failure path is as real and as deterministic as the happy path. Records are keyed by the
+    // original record's key (= orderId), so 3 partitions keeps per-order ordering in the DLQ too.
+
+    @Bean
+    public NewTopic ordersDlqTopic() {
+        return TopicBuilder.name(KafkaTopics.ORDERS_DLQ).partitions(PARTITIONS).replicas(REPLICATION_FACTOR).build();
+    }
+
+    @Bean
+    public NewTopic inventoryDlqTopic() {
+        return TopicBuilder.name(KafkaTopics.INVENTORY_DLQ).partitions(PARTITIONS).replicas(REPLICATION_FACTOR).build();
+    }
+
+    @Bean
+    public NewTopic paymentsDlqTopic() {
+        return TopicBuilder.name(KafkaTopics.PAYMENTS_DLQ).partitions(PARTITIONS).replicas(REPLICATION_FACTOR).build();
+    }
+
+    @Bean
+    public NewTopic fulfillmentDlqTopic() {
+        return TopicBuilder.name(KafkaTopics.FULFILLMENT_DLQ).partitions(PARTITIONS).replicas(REPLICATION_FACTOR).build();
+    }
 }

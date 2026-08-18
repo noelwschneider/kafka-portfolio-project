@@ -2,6 +2,8 @@ package com.orderfulfillment.inventory;
 
 import com.orderfulfillment.common.ConflictException;
 import com.orderfulfillment.common.NotFoundException;
+import com.orderfulfillment.common.idempotency.ProcessedEventKey;
+import com.orderfulfillment.common.kafka.KafkaTopics;
 import com.orderfulfillment.inventory.dto.InventoryItemDto;
 import java.time.Instant;
 import java.util.List;
@@ -100,10 +102,25 @@ public class InventoryService {
      * <p>Backoff is randomized so that contenders that collided once do not re-collide in lockstep.
      */
     public ReservationResult reserve(String orderId, List<OrderLine> lines) {
+        return reserve(orderId, lines, null);
+    }
+
+    /**
+     * As {@link #reserve(String, List)}, but idempotent with respect to {@code eventKey}: the
+     * {@code processed_events} claim happens inside the same transaction as the reservation (see
+     * {@link InventoryReservationExecutor}), so a redelivery of the same event returns
+     * {@link ReservationResult#DUPLICATE} having changed nothing.
+     *
+     * <p>Note what the retry loop does to the ledger, since it is the non-obvious part: each
+     * attempt claims the event and, if it loses the optimistic-lock race, rolls the claim back with
+     * the rest of its transaction. So a reservation that takes seven attempts still leaves exactly
+     * one ledger row, written by the attempt that actually committed.
+     */
+    public ReservationResult reserve(String orderId, List<OrderLine> lines, ProcessedEventKey eventKey) {
         ObjectOptimisticLockingFailureException lastConflict = null;
         for (int attempt = 0; attempt < MAX_OPTIMISTIC_LOCK_ATTEMPTS; attempt++) {
             try {
-                return executor.attemptReserve(orderId, lines);
+                return executor.attemptReserve(orderId, lines, eventKey);
             } catch (ObjectOptimisticLockingFailureException conflict) {
                 lastConflict = conflict;
                 optimisticLockConflicts.incrementAndGet();
@@ -116,12 +133,21 @@ public class InventoryService {
         // Kafka consumer path is bounded by partition count x listener concurrency x instances.
         // Logged at ERROR rather than swallowed because the caller has no contract-legal way to
         // report it — InventoryReservationFailed.reason is frozen to INSUFFICIENT_STOCK/UNKNOWN_SKU
-        // (docs/events/event-catalog.md), neither of which is true here. Propagating lets Spring
-        // Kafka's error handler redeliver the record, which is safe: the losing attempt's
-        // transaction rolled back, so a redelivery re-reads fresh state and writes nothing twice.
+        // (docs/events/event-catalog.md), neither of which is true here.
+        //
+        // Phase 4 gave this propagation a defined destination. ObjectOptimisticLockingFailureException
+        // is a TransientDataAccessException, so the shared error handler classifies it retryable:
+        // the record is redelivered up to three more times with 0.5s/1s/2s backoff — each redelivery
+        // being a fresh 25-attempt loop against fresh state, at a moment far enough away that the
+        // contention has almost certainly cleared — and if it still fails, the record lands on
+        // inventory.dlq with its failure metadata instead of being logged and skipped past. That is
+        // safe at every step because the losing attempt's transaction, ledger row included, rolled
+        // back, so a redelivery re-reads fresh state and writes nothing twice. See
+        // docs/reliability-pattern.md ("Gap 1") and docs/agent-reports/phase-4-pattern-design.md.
         log.error("Gave up reserving for order {} after {} optimistic-lock conflicts; the OrderCreated "
-                + "record will be redelivered by the consumer error handler",
-                orderId, MAX_OPTIMISTIC_LOCK_ATTEMPTS);
+                + "record will be redelivered by the consumer error handler and dead-lettered to {} "
+                + "if it keeps failing",
+                orderId, MAX_OPTIMISTIC_LOCK_ATTEMPTS, KafkaTopics.INVENTORY_DLQ);
         throw lastConflict;
     }
 
@@ -139,7 +165,16 @@ public class InventoryService {
 
     /** Releases every RESERVED reservation for an order — the InventoryReleased compensation step. */
     public ReleaseResult release(String orderId) {
-        return executor.release(orderId);
+        return release(orderId, null);
+    }
+
+    /**
+     * As {@link #release(String)}, but idempotent with respect to {@code eventKey}. Releasing is
+     * the operation that most obviously must not be applied twice: a second release would hand the
+     * same units back to stock again, inventing inventory out of nothing.
+     */
+    public ReleaseResult release(String orderId, ProcessedEventKey eventKey) {
+        return executor.release(orderId, eventKey);
     }
 
     private InventoryItemEntity findItem(String sku) {

@@ -16,7 +16,14 @@ public record PaymentOutcome(Kind kind, String paymentAttemptId, PaymentFailureR
          * transition instead (docs/order-state-machine.md transition 9) — a documented, temporary
          * simplification, not a claim that retries happened.
          */
-        PROVIDER_ERROR
+        PROVIDER_ERROR,
+        /**
+         * An earlier (or concurrent) delivery of the same Kafka event already claimed the
+         * {@code processed_events} ledger row and ran this authorization
+         * (docs/reliability-pattern.md §2.4). Distinct from a real business outcome so the consumer
+         * publishes nothing for it — the earlier delivery already published the real answer.
+         */
+        DUPLICATE
     }
 
     public static PaymentOutcome authorized(String paymentAttemptId) {
@@ -29,5 +36,9 @@ public record PaymentOutcome(Kind kind, String paymentAttemptId, PaymentFailureR
 
     public static PaymentOutcome providerError(String paymentAttemptId) {
         return new PaymentOutcome(Kind.PROVIDER_ERROR, paymentAttemptId, null);
+    }
+
+    public static PaymentOutcome duplicate() {
+        return new PaymentOutcome(Kind.DUPLICATE, null, null);
     }
 }

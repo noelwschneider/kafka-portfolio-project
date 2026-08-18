@@ -33,14 +33,14 @@ class InventoryServiceOptimisticLockTest {
         InventoryService service = new InventoryService(itemRepository, executor);
 
         List<OrderLine> lines = List.of(new OrderLine("SKU-001", 1));
-        when(executor.attemptReserve("order-1", lines))
+        when(executor.attemptReserve("order-1", lines, null))
                 .thenThrow(new ObjectOptimisticLockingFailureException(InventoryItemEntity.class, "SKU-001"))
                 .thenReturn(ReservationResult.reserved("resv-1"));
 
         ReservationResult result = service.reserve("order-1", lines);
 
         assertThat(result.success()).isTrue();
-        verify(executor, times(2)).attemptReserve("order-1", lines);
+        verify(executor, times(2)).attemptReserve("order-1", lines, null);
     }
 
     @Test
@@ -50,7 +50,7 @@ class InventoryServiceOptimisticLockTest {
         InventoryService service = new InventoryService(itemRepository, executor);
 
         List<OrderLine> lines = List.of(new OrderLine("SKU-001", 1));
-        when(executor.attemptReserve("order-1", lines))
+        when(executor.attemptReserve("order-1", lines, null))
                 .thenThrow(new ObjectOptimisticLockingFailureException(InventoryItemEntity.class, "SKU-001"));
 
         assertThatThrownBy(() -> service.reserve("order-1", lines))
@@ -58,6 +58,6 @@ class InventoryServiceOptimisticLockTest {
         // 25 = InventoryService.MAX_OPTIMISTIC_LOCK_ATTEMPTS. A stub that conflicts forever is the
         // one thing real contention cannot produce (every real conflict consumes stock and so makes
         // progress) — this only pins down that the loop is bounded and rethrows the last conflict.
-        verify(executor, times(25)).attemptReserve("order-1", lines);
+        verify(executor, times(25)).attemptReserve("order-1", lines, null);
     }
 }

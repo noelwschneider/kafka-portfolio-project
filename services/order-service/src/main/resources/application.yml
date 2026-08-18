@@ -31,6 +31,13 @@ spring:
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       auto-offset-reset: earliest
 
+orderfulfillment:
+  reliability:
+    # This service's own copy of the idempotency ledger, in its own schema (docs/db-ownership.md §2
+    # — processed_events is per-service, never shared, because the dedup insert must commit in the
+    # same local transaction as the business change). Created by V2__processed_events.sql.
+    processed-events-table: order_service.processed_events
+
 server:
   port: 8081
 

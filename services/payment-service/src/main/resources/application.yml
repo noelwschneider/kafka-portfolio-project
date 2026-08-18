@@ -27,6 +27,10 @@ spring:
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       auto-offset-reset: earliest
 
+orderfulfillment:
+  reliability:
+    processed-events-table: payment_service.processed_events
+
 server:
   port: 8083
 

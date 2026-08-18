@@ -13,6 +13,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -72,6 +74,18 @@ abstract class AbstractIntegrationTest {
 
     @Autowired
     EventPublisher eventPublisher;
+
+    /**
+     * For publishing records {@link EventPublisher} deliberately cannot produce — an envelope with
+     * an {@code eventVersion} the codec rejects, or a payload that will not deserialize. Phase 4's
+     * poison-message scenario needs a genuinely malformed record on the wire, not a mocked failure.
+     */
+    @Autowired
+    KafkaTemplate<String, String> kafkaTemplate;
+
+    /** Direct reads of the processed_events ledger, which has no JPA entity by design. */
+    @Autowired
+    JdbcClient jdbcClient;
 
     RestTestClient client;
 

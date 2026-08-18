@@ -13,6 +13,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -63,6 +65,19 @@ abstract class AbstractIntegrationTest {
 
     @Autowired
     PaymentBehaviorStore paymentBehaviorStore;
+
+    /** Direct reads of the processed_events ledger, which has no JPA entity by design. */
+    @Autowired
+    JdbcClient jdbcClient;
+
+    /**
+     * For publishing records {@link EventPublisher} deliberately cannot produce — an envelope with
+     * an {@code eventVersion} the codec rejects, or a payload that will not deserialize. Phase 4's
+     * poison-message and duplicate-delivery scenarios need genuine records on the wire, not mocked
+     * failures.
+     */
+    @Autowired
+    KafkaTemplate<String, String> kafkaTemplate;
 
     RestTestClient client;
 

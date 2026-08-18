@@ -35,6 +35,13 @@ spring:
       # (several inventory-service instances in the same consumer group) would produce anyway.
       concurrency: 3
 
+orderfulfillment:
+  reliability:
+    # This service's own copy of the idempotency ledger, in its own schema (docs/db-ownership.md §2
+    # — processed_events is per-service, never shared, because the dedup insert must commit in the
+    # same local transaction as the business change). Created by V4__processed_events.sql.
+    processed-events-table: inventory_service.processed_events
+
 server:
   port: 8082
 

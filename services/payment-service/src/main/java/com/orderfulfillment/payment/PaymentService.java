@@ -2,6 +2,8 @@ package com.orderfulfillment.payment;
 
 import com.orderfulfillment.common.IdGenerator;
 import com.orderfulfillment.common.NotFoundException;
+import com.orderfulfillment.common.idempotency.ProcessedEventKey;
+import com.orderfulfillment.common.idempotency.ProcessedEventLedger;
 import com.orderfulfillment.payment.dto.PaymentAttemptDto;
 import com.orderfulfillment.payment.dto.PaymentBehaviorDto;
 import java.math.BigDecimal;
@@ -22,15 +24,37 @@ public class PaymentService {
     private final PaymentAttemptRepository repository;
     private final PaymentBehaviorStore behaviorStore;
     private final IdGenerator idGenerator;
+    private final ProcessedEventLedger processedEventLedger;
 
-    public PaymentService(PaymentAttemptRepository repository, PaymentBehaviorStore behaviorStore, IdGenerator idGenerator) {
+    public PaymentService(PaymentAttemptRepository repository, PaymentBehaviorStore behaviorStore,
+                           IdGenerator idGenerator, ProcessedEventLedger processedEventLedger) {
         this.repository = repository;
         this.behaviorStore = behaviorStore;
         this.idGenerator = idGenerator;
+        this.processedEventLedger = processedEventLedger;
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    /** Convenience overload for callers with no Kafka event to deduplicate against. */
     public PaymentOutcome authorize(String orderId, BigDecimal amount, UUID idempotencyKey) {
+        return authorize(orderId, amount, idempotencyKey, null);
+    }
+
+    /**
+     * @param eventKey the {@code (eventId, consumerName)} of the {@code PaymentRequested} delivery
+     *                 that triggered this call, or {@code null} if there is none to deduplicate
+     *                 against. When present, the ledger claim is this method's first statement
+     *                 (docs/reliability-pattern.md §2.3) — it commits atomically with the
+     *                 {@code payment_attempts} row in the same {@code REQUIRES_NEW} transaction, so
+     *                 a crash between the two cannot leave one without the other. A lost claim
+     *                 (an earlier or concurrent delivery already recorded this event) short-circuits
+     *                 before any business logic runs and returns {@link PaymentOutcome#duplicate()}.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public PaymentOutcome authorize(String orderId, BigDecimal amount, UUID idempotencyKey, ProcessedEventKey eventKey) {
+        if (eventKey != null && !processedEventLedger.recordProcessed(eventKey)) {
+            return PaymentOutcome.duplicate();
+        }
+
         PaymentBehaviorDto behavior = behaviorStore.resolveFor(orderId);
         String attemptId = idGenerator.nextPaymentId();
         Instant now = Instant.now();

@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.orderfulfillment.common.IdGenerator;
+import com.orderfulfillment.common.idempotency.ProcessedEventLedger;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -24,12 +25,17 @@ class InventoryReservationExecutorTest {
     private InventoryReservationRepository reservationRepository;
     @Mock
     private IdGenerator idGenerator;
+    /** Never consulted here: every call in this class passes a null event key, i.e. "not driven by
+     * a Kafka record, nothing to deduplicate". The ledger's real behaviour is covered against a
+     * real database by {@link InventoryDuplicateEventIntegrationTest}. */
+    @Mock
+    private ProcessedEventLedger processedEventLedger;
 
     private InventoryReservationExecutor executor;
 
     @BeforeEach
     void setUp() {
-        executor = new InventoryReservationExecutor(itemRepository, reservationRepository, idGenerator);
+        executor = new InventoryReservationExecutor(itemRepository, reservationRepository, idGenerator, processedEventLedger);
     }
 
     @Test
@@ -38,7 +44,7 @@ class InventoryReservationExecutorTest {
         when(itemRepository.findById("SKU-001")).thenReturn(Optional.of(item));
         when(idGenerator.nextReservationId()).thenReturn("resv-1");
 
-        ReservationResult result = executor.attemptReserve("order-1", List.of(new OrderLine("SKU-001", 2)));
+        ReservationResult result = executor.attemptReserve("order-1", List.of(new OrderLine("SKU-001", 2)), null);
 
         assertThat(result.success()).isTrue();
         assertThat(item.getReservedQuantity()).isEqualTo(2);
@@ -53,7 +59,7 @@ class InventoryReservationExecutorTest {
         when(itemRepository.findById("SKU-004")).thenReturn(Optional.of(scarce));
 
         ReservationResult result = executor.attemptReserve("order-2",
-                List.of(new OrderLine("SKU-001", 1), new OrderLine("SKU-004", 5)));
+                List.of(new OrderLine("SKU-001", 1), new OrderLine("SKU-004", 5)), null);
 
         assertThat(result.success()).isFalse();
         assertThat(result.failureReason()).isEqualTo("INSUFFICIENT_STOCK");
@@ -66,7 +72,7 @@ class InventoryReservationExecutorTest {
     void unknownSkuIsReportedAsShortage() {
         when(itemRepository.findById("SKU-999")).thenReturn(Optional.empty());
 
-        ReservationResult result = executor.attemptReserve("order-3", List.of(new OrderLine("SKU-999", 1)));
+        ReservationResult result = executor.attemptReserve("order-3", List.of(new OrderLine("SKU-999", 1)), null);
 
         assertThat(result.success()).isFalse();
         assertThat(result.failureReason()).isEqualTo("UNKNOWN_SKU");
@@ -81,7 +87,7 @@ class InventoryReservationExecutorTest {
                 .thenReturn(List.of(reservation));
         when(itemRepository.findById("SKU-001")).thenReturn(Optional.of(item));
 
-        ReleaseResult result = executor.release("order-1");
+        ReleaseResult result = executor.release("order-1", null);
 
         assertThat(item.getReservedQuantity()).isZero();
         assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.RELEASED);
@@ -94,7 +100,7 @@ class InventoryReservationExecutorTest {
         when(reservationRepository.findByOrderIdAndStatus("order-none", ReservationStatus.RESERVED))
                 .thenReturn(List.of());
 
-        ReleaseResult result = executor.release("order-none");
+        ReleaseResult result = executor.release("order-none", null);
 
         assertThat(result).isEqualTo(ReleaseResult.NONE);
     }
