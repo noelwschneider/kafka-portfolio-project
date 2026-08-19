@@ -107,6 +107,76 @@ Kafka is configured with two listeners so both workflows above work against the 
 See `docs/agent-reports/phase-7-containerization.md` for why a single `PLAINTEXT://localhost:9092`
 listener (the pre-Phase-7 config) breaks once services run as separate containers.
 
+## Run the whole stack in Kubernetes (local `kind`)
+
+A third supported path, alongside (not replacing) the two above — see `docs/adr/ADR-007-kubernetes-only-after-local-boundaries-stabilize.md`
+for why Kubernetes only shows up now, in Phase 8, and stays permanently optional. Plain YAML
+manifests, no Helm, targeting local `kind` (not Minikube, not Docker Desktop Kubernetes).
+
+Prerequisites: `kind` (`brew install kind`) and `kubectl`, plus Docker (already required above).
+
+1. Create the cluster. `infrastructure/kind-config.yaml` maps the cluster's NodePorts onto the
+   same host ports Compose already uses (8081-8085 for the backend services, 5173 for the
+   frontend), so nothing downstream needs to know it's talking to Kubernetes instead of Compose.
+   It lives one level above `infrastructure/kubernetes/` deliberately — that directory holds only
+   real Kubernetes API objects, so `kubectl apply -f infrastructure/kubernetes/` (step 3) can apply
+   the whole directory without tripping over a `kind`-only config file that isn't a k8s resource:
+
+   ```bash
+   kind create cluster --config infrastructure/kind-config.yaml
+   ```
+
+2. Build the 6 images with the `:local` tag `kind load` expects (same Dockerfiles as the Compose
+   path, repo root as build context for the 5 backend services):
+
+   ```bash
+   for s in order inventory payment fulfillment scenario; do
+     docker build -f services/${s}-service/Dockerfile -t ${s}-service:local .
+   done
+   docker build -t frontend:local frontend/
+   ```
+
+3. Load them into the cluster's node (`kind` clusters don't see your local Docker image cache) and
+   apply the manifests:
+
+   ```bash
+   for img in order-service inventory-service payment-service fulfillment-service scenario-service frontend; do
+     kind load docker-image "${img}:local" --name orderfulfillment
+   done
+   kubectl apply -f infrastructure/kubernetes/
+   ```
+
+4. Check everything came up:
+
+   ```bash
+   kubectl get pods -n orderfulfillment
+   kubectl wait --for=condition=ready pod --all -n orderfulfillment --timeout=300s
+   ```
+
+   Same health endpoints as the Compose path, same host ports, now backed by the cluster:
+
+   ```bash
+   curl http://localhost:8081/actuator/health/liveness
+   curl http://localhost:8081/actuator/health/readiness
+   ```
+
+   Frontend: **http://localhost:5173**
+
+5. Tear down when you're done — a `kind` cluster is fully ephemeral, so this is a clean full wipe,
+   not the "keep the volume" caution that applies to the Compose Postgres data:
+
+   ```bash
+   kind delete cluster --name orderfulfillment
+   ```
+
+See `docs/agent-reports/phase-8-kubernetes.md` for the manifest inventory, resource-sizing
+reasoning, the Ingress-vs-NodePort call, and a live readiness-vs-liveness demonstration (including
+a real finding: this app has no Kafka Actuator health indicator registered at all, so the
+demonstration uses a Postgres outage instead, and the backend ConfigMaps add
+`MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE=readinessState,db` — a manifest-level property
+override, no application source touched — to make readiness actually reflect that dependency; see
+that report for the full explanation and live numbers).
+
 ## Running tests
 
 Tests are unaffected by any of the above — they still spin up their own Testcontainers-managed

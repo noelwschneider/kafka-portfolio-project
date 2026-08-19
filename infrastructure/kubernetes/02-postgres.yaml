@@ -1,0 +1,80 @@
+# Single-instance Postgres in-cluster (plain Deployment + PVC, not a StatefulSet — this is a
+# local demo cluster with one replica and no replication story, matching docker-compose.yml's
+# postgres service; a StatefulSet would demonstrate nothing extra here).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: orderfulfillment
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: orderfulfillment
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # single PVC, ReadWriteOnce — never run two postgres pods at once
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: postgres-credentials
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+              subPath: pgdata # avoid postgres complaining about lost+found in the mount root
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "orderfulfillment", "-d", "orderfulfillment"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "orderfulfillment", "-d", "orderfulfillment"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: orderfulfillment
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432

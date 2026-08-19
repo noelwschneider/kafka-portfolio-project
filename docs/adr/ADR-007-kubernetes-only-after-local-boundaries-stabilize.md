@@ -1,6 +1,6 @@
 # ADR-007: Use Kubernetes only after local service boundaries stabilize
 
-- **Status:** Accepted — **not yet implemented.** Containerization is Phase 7, Kubernetes is Phase 8.
+- **Status:** Accepted. Frozen in Phase 0; implemented in Phase 8.
 - **Date:** 2026-08-17 (Phase 0)
 
 ## Context

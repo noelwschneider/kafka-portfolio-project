@@ -1,0 +1,32 @@
+# kind cluster config for local Phase 8 verification/demo of the Order Fulfillment Systems Lab.
+#
+# Maps container NodePorts to the same host ports Docker Compose already uses (8081-8085 for the
+# 5 backend services, 5173 for the frontend), per docs/adr/ADR-007. Point of doing it this way:
+# the frontend's Vite build already bakes in http://localhost:8081..8085 as its default backend
+# URLs (frontend/.env.example), so keeping those exact host ports means the existing frontend
+# Docker image (built once by Phase 7, unmodified here) works against the kind cluster with zero
+# rebuild and zero env changes — the browser can't tell it isn't talking to Compose.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: orderfulfillment
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 30081
+        hostPort: 8081
+        protocol: TCP
+      - containerPort: 30082
+        hostPort: 8082
+        protocol: TCP
+      - containerPort: 30083
+        hostPort: 8083
+        protocol: TCP
+      - containerPort: 30084
+        hostPort: 8084
+        protocol: TCP
+      - containerPort: 30085
+        hostPort: 8085
+        protocol: TCP
+      - containerPort: 30173
+        hostPort: 5173
+        protocol: TCP
