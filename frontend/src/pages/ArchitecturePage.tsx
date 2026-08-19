@@ -239,11 +239,24 @@ export function ArchitecturePage() {
         with the ledger row and the business change committed in the same local transaction — this
         is what makes Scenario 4's duplicate delivery produce no duplicate side effect. Retries use
         bounded backoff; a record that exhausts retries is routed to that consumer's DLQ with
-        failure metadata rather than blocking its partition indefinitely (Scenario 6). One gap that
-        is explicitly not yet closed: three of the five services publish after committing rather
-        than through a transactional outbox, leaving a small dual-write window where a crash between
-        commit and publish loses the event — Order Service closes this with an outbox in Phase 6
-        (ADR-006); the others do not yet.
+        failure metadata rather than blocking its partition indefinitely (Scenario 6).
+      </p>
+      <p>
+        <strong>Durable publication, in one service.</strong> Order Service no longer publishes to
+        Kafka after committing. Both events it produces — <code>OrderCreated</code> and{' '}
+        <code>PaymentRequested</code> — are written to an <code>outbox_events</code> row in the same
+        transaction as the business change, and a background publisher polls those rows, sends them
+        in insertion order and marks them published (Phase 6, ADR-006). A crash can no longer strand
+        an order with an event that was never published; it can only resend one that was, which the
+        idempotent consumers above already absorb. This is still at-least-once, not exactly-once.
+      </p>
+      <p>
+        <strong>The gap that remains.</strong> Inventory, Payment and Fulfillment Service still
+        publish after committing, so a crash in that window loses the event. It does not heal
+        itself: those publishes happen after a transaction that already claimed the{' '}
+        <code>processed_events</code> row for the event being handled, so a redelivery is skipped as
+        a duplicate rather than republishing. Closing it for those three is not done, and the
+        architecture claims above apply to Order Service only.
       </p>
 
       <h2>Repository documentation</h2>

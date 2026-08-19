@@ -5,14 +5,11 @@ import com.orderfulfillment.common.CorrelationIdHolder;
 import com.orderfulfillment.common.events.EventEnvelope;
 import com.orderfulfillment.common.events.InventoryReservationFailedPayload;
 import com.orderfulfillment.common.events.InventoryReservedPayload;
-import com.orderfulfillment.common.events.PaymentRequestedPayload;
 import com.orderfulfillment.common.idempotency.ProcessedEventKey;
 import com.orderfulfillment.common.idempotency.ProcessedEventLedger;
 import com.orderfulfillment.common.kafka.EventCodec;
-import com.orderfulfillment.common.kafka.EventPublisher;
 import com.orderfulfillment.common.kafka.EventTypes;
 import com.orderfulfillment.common.kafka.KafkaTopics;
-import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -20,7 +17,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Order Service's consumer for {@code inventory.events}, driving transitions 2/3 of
- * docs/order-state-machine.md and, on success, transition 4 (publishing PaymentRequested).
+ * docs/order-state-machine.md and, on success, transition 4 (whose PaymentRequested is recorded in
+ * the outbox by the same transaction — ADR-006, Phase 6).
  * Own consumer group ("order-service") so Order Service reads every record on this topic
  * independently of any other consumer group.
  *
@@ -41,14 +39,12 @@ public class OrderInventoryEventsConsumer {
 
     private final OrderPersistence persistence;
     private final EventCodec eventCodec;
-    private final EventPublisher eventPublisher;
     private final ProcessedEventLedger processedEventLedger;
 
     public OrderInventoryEventsConsumer(OrderPersistence persistence, EventCodec eventCodec,
-                                         EventPublisher eventPublisher, ProcessedEventLedger processedEventLedger) {
+                                         ProcessedEventLedger processedEventLedger) {
         this.persistence = persistence;
         this.eventCodec = eventCodec;
-        this.eventPublisher = eventPublisher;
         this.processedEventLedger = processedEventLedger;
     }
 
@@ -81,17 +77,10 @@ public class OrderInventoryEventsConsumer {
             return;
         }
 
-        StatusTransitionResult result =
-                persistence.appendInventoryReservedTransition(orderId, envelope.eventId(), eventKey);
-        if (result.duplicate()) {
-            // A concurrent delivery of the same event won the ledger claim; it publishes PaymentRequested.
-            return;
-        }
-
-        UUID eventId = UUID.randomUUID();
-        PaymentRequestedPayload requestPayload =
-                new PaymentRequestedPayload(orderId, result.totalAmount(), eventId);
-        eventPublisher.publish(KafkaTopics.ORDERS_EVENTS, EventTypes.PAYMENT_REQUESTED, orderId, eventId, requestPayload);
+        // PaymentRequested is recorded in the outbox by that same transaction (ADR-006 + the method's
+        // Javadoc), so there is nothing left to publish here — and, crucially, no window in which
+        // this consumer could have committed the processed_events claim without the event.
+        persistence.appendInventoryReservedTransition(orderId, envelope.eventId(), eventKey);
     }
 
     private void onInventoryReservationFailed(EventEnvelope<JsonNode> envelope) {

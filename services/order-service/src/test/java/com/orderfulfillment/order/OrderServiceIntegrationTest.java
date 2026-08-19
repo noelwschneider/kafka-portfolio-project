@@ -20,6 +20,7 @@ import com.orderfulfillment.order.dto.OrderDetail;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.apache.kafka.clients.consumer.Consumer;
@@ -45,13 +46,20 @@ class OrderServiceIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(accepted.status()).isEqualTo("PENDING");
 
+        // Since Phase 6 (ADR-006) OrderCreated is committed to the outbox by createOrder and sent by
+        // the background publisher a poll interval later, so this waits rather than assuming the
+        // record is already on the topic when the HTTP call returns. The assertion itself is
+        // unchanged — same event, same key — and the sibling PaymentRequested test below has always
+        // been written this way.
         Consumer<String, String> consumer = rawConsumer(KafkaTopics.ORDERS_EVENTS);
+        List<String> seen = new ArrayList<>();
         try {
-            ConsumerRecords<String, String> records = KafkaTestUtils.getRecords(consumer, POLL_TIMEOUT);
-            assertThat(records.count()).isGreaterThanOrEqualTo(1);
-            assertThat(records).anySatisfy(record -> {
-                assertThat(record.value()).contains("\"eventType\":\"" + EventTypes.ORDER_CREATED + "\"");
-                assertThat(record.value()).contains(accepted.id());
+            await().atMost(POLL_TIMEOUT).untilAsserted(() -> {
+                KafkaTestUtils.getRecords(consumer, Duration.ofSeconds(1)).forEach(r -> seen.add(r.value()));
+                assertThat(seen).anySatisfy(value -> {
+                    assertThat(value).contains("\"eventType\":\"" + EventTypes.ORDER_CREATED + "\"");
+                    assertThat(value).contains(accepted.id());
+                });
             });
         } finally {
             consumer.close();

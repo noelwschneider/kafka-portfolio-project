@@ -1,8 +1,8 @@
 # ADR-006: Add a transactional outbox for database/Kafka consistency
 
-- **Status:** Accepted — **not yet implemented.** Planned for Phase 6, in Order Service only. Phases
-  1–5 deliberately ship the simpler publish-after-commit behavior, with the resulting failure window
-  documented rather than hidden.
+- **Status:** Accepted. Frozen in Phase 0; implemented in Phase 6, in Order Service only. Phases
+  1–5 deliberately shipped the simpler publish-after-commit behavior, with the resulting failure
+  window documented rather than hidden; Inventory, Payment and Fulfillment Service still ship it.
 - **Date:** 2026-08-17 (Phase 0)
 
 ## Context
@@ -48,10 +48,23 @@ id, aggregate_id, event_type, payload (full envelope), created_at, published_at,
 
 Scope is deliberately one service. `docs/planning/implementation-phases.md`'s Phase 6 says "at least the
 most important publisher, likely Order Service", and Order Service is the right choice: it is the only
-publisher whose lost event strands an order that a user has already been told was accepted. The other
-publishers lose an event that a redelivery can regenerate, because their publishes are themselves
-reactions to consumed events — if `InventoryReserved` is lost, the `OrderCreated` that caused it can be
-reprocessed.
+publisher whose lost event strands an order that a user has already been told was accepted.
+
+> **Correction, Phase 6 (implementation).** This section originally continued: "The other publishers
+> lose an event that a redelivery can regenerate, because their publishes are themselves reactions to
+> consumed events — if `InventoryReserved` is lost, the `OrderCreated` that caused it can be
+> reprocessed." That is **not true of this implementation**, and the mistake matters. Every
+> event-driven publish site in all four services claims its `processed_events` row *inside* the
+> business transaction (ADR-005 requires exactly that), so a redelivery is short-circuited by the
+> ledger before it can republish anything: the event is not regenerated, it is silently skipped. A
+> crash between such a commit and its publish strands the order just as permanently as a lost
+> `OrderCreated` does — only at a later status. Phase 6 therefore routed **both** of Order Service's
+> publish sites through the outbox (`OrderCreated` from `POST /api/orders`, and `PaymentRequested`
+> from the `InventoryReserved` transition), not just the first. The same reasoning applies to
+> Inventory, Payment and Fulfillment Service, which remain out of scope and therefore still carry a
+> real, non-self-healing dual-write window — see `docs/agent-reports/phase-6-outbox.md` §Judgment
+> calls. What redelivery does still cover is the narrower case of a consumer that crashes *before*
+> committing anything at all.
 
 ## Alternatives considered
 
@@ -87,6 +100,26 @@ published" (which is what the outbox is), it does not generalize past the first 
 cannot preserve publication order.
 
 ## Consequences and tradeoffs
+
+**As built (Phase 6).** The list below was written in Phase 0 and held up; these are the points where
+implementation pinned down something the prose left open (full detail in
+`docs/agent-reports/phase-6-outbox.md`):
+
+- Both Order Service publish sites go through the outbox, for the reason in the Decision correction
+  above. `OrderCreated` is recorded by `OrderPersistence#createPendingOrder`, `PaymentRequested` by
+  `OrderPersistence#appendInventoryReservedTransition` — the same transactions that already commit the
+  business rows and, for the second, the `processed_events` claim.
+- Polling only, no notify-on-commit hook: the interval is a property
+  (`orderfulfillment.outbox.poll-interval-ms`) defaulting to 50 ms, which is inside the latency budget
+  below without a second concurrent path into the publisher.
+- Retries are bounded by row age, not by a counter, because the frozen schema has no retry-count
+  column: a failing send leaves the row `PENDING` and stops the batch (ordering), and a row that is
+  still unpublished `orderfulfillment.outbox.fail-after-ms` after it was written (default 5 min) is
+  marked `FAILED`, logged at ERROR, and skipped so it cannot block the queue forever.
+- The envelope is built and serialized at business-transaction time, so `eventId`, `occurredAt` and
+  `correlationId` describe the business event rather than the send attempt, and are stable across
+  resends. The `payload` column being `jsonb` means PostgreSQL normalizes that text (key order,
+  whitespace), so the publisher re-serializes it compactly on the way out; the document is unchanged.
 
 **While unimplemented (Phases 1–5).**
 

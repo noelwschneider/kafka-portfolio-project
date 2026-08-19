@@ -235,6 +235,10 @@ Stated plainly so no diagram above is read as promising more than the implementa
   relative order. Nothing guarantees ordering across orders.
 - **Eventual consistency across services.** An order can be `PAID` for a few milliseconds before a
   shipment exists. Every read is a snapshot of one service's view.
-- **A dual-write window exists until Phase 6.** Publishers persist and then publish, so a crash in
-  between loses the event. Order Service closes this with a transactional outbox in Phase 6; the other
-  three services keep publish-after-commit (ADR-006).
+- **A dual-write window still exists in three of the four services.** Inventory, Payment and
+  Fulfillment Service persist and then publish, so a crash in between loses the event. Order Service
+  closed this in Phase 6 (ADR-006): both events it produces — `OrderCreated` and `PaymentRequested` —
+  are written to an `outbox_events` row in the same transaction as the business change, and a
+  background publisher sends them and marks them published. That makes Order Service's publication
+  durable, not exactly-once: a crash between the send and the mark resends the row, which the
+  idempotent consumers above absorb.

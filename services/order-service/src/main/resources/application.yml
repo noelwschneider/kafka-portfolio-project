@@ -37,6 +37,20 @@ orderfulfillment:
     # — processed_events is per-service, never shared, because the dedup insert must commit in the
     # same local transaction as the business change). Created by V2__processed_events.sql.
     processed-events-table: order_service.processed_events
+  outbox:
+    # Phase 6's transactional outbox (ADR-006), Order Service only. The poll interval is the
+    # publication latency this pattern costs: ADR-006 budgets "tens of milliseconds if the publisher
+    # polls tightly", and 50ms is inside that without a notify-on-commit hook.
+    poll-interval-ms: 50
+    # Rows per tick. Sends are sequential and acknowledged one at a time (ordering), so this bounds
+    # how long one transaction can hold its FOR UPDATE lock on the pending rows.
+    batch-size: 100
+    # How long to block on one broker acknowledgement before treating the send as failed.
+    send-timeout-ms: 10000
+    # Retry budget, expressed as age because the frozen schema has no retry-count column: a row that
+    # cannot be published within 5 minutes of being written is marked FAILED (and logged at ERROR)
+    # rather than retried forever, so a permanently unpublishable row cannot block the queue.
+    fail-after-ms: 300000
 
 management:
   endpoints:

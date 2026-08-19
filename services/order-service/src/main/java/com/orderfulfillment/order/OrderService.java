@@ -3,11 +3,6 @@ package com.orderfulfillment.order;
 import com.orderfulfillment.common.IdGenerator;
 import com.orderfulfillment.common.NotFoundException;
 import com.orderfulfillment.common.ValidationApiException;
-import com.orderfulfillment.common.events.EventItem;
-import com.orderfulfillment.common.events.OrderCreatedPayload;
-import com.orderfulfillment.common.kafka.EventPublisher;
-import com.orderfulfillment.common.kafka.EventTypes;
-import com.orderfulfillment.common.kafka.KafkaTopics;
 import com.orderfulfillment.order.dto.CreateOrderItem;
 import com.orderfulfillment.order.dto.CreateOrderRequest;
 import com.orderfulfillment.order.dto.OrderAccepted;
@@ -24,8 +19,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Entry point for {@code POST /api/orders}. Phase 2: persists the order as PENDING, publishes
- * OrderCreated, and returns — it does not wait for inventory, payment, or fulfillment. That
+ * Entry point for {@code POST /api/orders}. Phase 2: persists the order as PENDING, records
+ * OrderCreated for publication (since Phase 6, in the outbox — ADR-006), and returns — it does not wait for inventory, payment, or fulfillment. That
  * happens because Inventory/Payment/Fulfillment now react to Kafka events (see the {@code kafka}
  * subpackage's consumers) rather than being called directly from here, so this class no longer
  * knows or cares how the order eventually resolves. This finally matches
@@ -42,18 +37,16 @@ public class OrderService {
     private final OrderPersistence persistence;
     private final SkuPriceCatalog priceCatalog;
     private final IdGenerator idGenerator;
-    private final EventPublisher eventPublisher;
 
     public OrderService(OrderRepository orderRepository, OrderItemRepository orderItemRepository,
                          OrderStatusHistoryRepository historyRepository, OrderPersistence persistence,
-                         SkuPriceCatalog priceCatalog, IdGenerator idGenerator, EventPublisher eventPublisher) {
+                         SkuPriceCatalog priceCatalog, IdGenerator idGenerator) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.historyRepository = historyRepository;
         this.persistence = persistence;
         this.priceCatalog = priceCatalog;
         this.idGenerator = idGenerator;
-        this.eventPublisher = eventPublisher;
     }
 
     public OrderAccepted createOrder(CreateOrderRequest request) {
@@ -69,12 +62,9 @@ public class OrderService {
                 .map(i -> new OrderItemEntity(orderId, i.getSku(), i.getQuantity(), i.getUnitPrice()))
                 .toList();
 
+        // OrderCreated is recorded in the outbox inside this call's transaction (ADR-006), not
+        // published from here afterwards — the crash window between the two no longer exists.
         OrderEntity order = persistence.createPendingOrder(orderId, request.customerId(), associated, totalAmount);
-
-        List<EventItem> items = request.items().stream()
-                .map(i -> new EventItem(i.sku(), i.quantity())).toList();
-        OrderCreatedPayload payload = new OrderCreatedPayload(orderId, request.customerId(), items);
-        eventPublisher.publish(KafkaTopics.ORDERS_EVENTS, EventTypes.ORDER_CREATED, orderId, payload);
 
         return new OrderAccepted(orderId, order.getStatus().name(), order.getCreatedAt());
     }

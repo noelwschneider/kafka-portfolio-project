@@ -5,6 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.TypeExcludeFilter;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Order Service — Phase 3 extraction from the Phase 1/2 monolith. Runs standalone on port 8081
@@ -25,6 +26,7 @@ import org.springframework.context.annotation.FilterType;
  * test class would silently pollute every other test's context.
  */
 @SpringBootApplication
+@EnableScheduling // Phase 6: drives OutboxPublisher's poll of outbox_events (ADR-006).
 @ComponentScan(
         basePackages = {"com.orderfulfillment.order", "com.orderfulfillment.common"},
         excludeFilters = @ComponentScan.Filter(type = FilterType.CUSTOM, classes = TypeExcludeFilter.class))
