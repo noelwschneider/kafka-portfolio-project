@@ -1,0 +1,23 @@
+# Applies to the default build context (repo root) used by every backend service Dockerfile.
+# Keeps the build context small and avoids invalidating Docker's layer cache on unrelated churn.
+
+# Maven build output (rebuilt inside each image anyway)
+**/target/
+
+# Frontend (has its own .dockerignore; not needed in backend build contexts)
+frontend/node_modules/
+frontend/dist/
+
+# VCS / IDE / OS noise
+.git/
+.gitignore
+.idea/
+.vscode/
+*.DS_Store
+
+# Planning/report docs aren't needed to build a jar
+docs/
+
+# Local env files that must never end up baked into an image
+.env
+.env.*
