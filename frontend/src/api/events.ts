@@ -40,11 +40,7 @@ export interface EventQueryFilters {
   deadLettered?: boolean;
 }
 
-export type EventQueryResult =
-  | { wired: true; events: EventRecord[] }
-  | { wired: false; reason: string; events: EventRecord[] };
-
-export async function queryEvents(filters: EventQueryFilters): Promise<EventQueryResult> {
+export function queryEvents(filters: EventQueryFilters): Promise<EventRecord[]> {
   const query = new URLSearchParams();
   if (filters.eventType) query.set('eventType', filters.eventType);
   // The API's aggregateId is always an orderId in this system (docs/events/event-catalog.md §1),
@@ -57,9 +53,6 @@ export async function queryEvents(filters: EventQueryFilters): Promise<EventQuer
   if (filters.deadLettered !== undefined) query.set('deadLettered', String(filters.deadLettered));
   query.set('size', '50');
 
-  const page = await apiFetch<EventRecordPage>(
-    SCENARIO_SERVICE_BASE_URL,
-    `/demo/events?${query.toString()}`,
-  );
-  return { wired: true, events: page.content };
+  return apiFetch<EventRecordPage>(SCENARIO_SERVICE_BASE_URL, `/demo/events?${query.toString()}`)
+    .then((page) => page.content);
 }

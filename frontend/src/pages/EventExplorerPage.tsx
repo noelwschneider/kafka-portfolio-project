@@ -2,14 +2,12 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { queryEvents, type EventQueryFilters } from '../api/events';
 
-// frontend-design.md §12.5. See src/api/events.ts's file header for the full status: the backing
-// query endpoint is not yet defined in docs/openapi/scenario-service.yaml as of this build, so this
-// page renders its filters and layout for real but shows an explicit "not yet wired" banner
-// instead of a fabricated or silently-empty table.
+// frontend-design.md §12.5. Backed by Scenario Service's GET /demo/events (the event-projection
+// endpoint added in Phase 5, docs/CHANGELOG-contracts.md) via src/api/events.ts.
 export function EventExplorerPage() {
   const [filters, setFilters] = useState<EventQueryFilters>({});
 
-  const { data } = useQuery({
+  const { data, isError, error } = useQuery({
     queryKey: ['events', filters],
     queryFn: () => queryEvents(filters),
   });
@@ -84,10 +82,11 @@ export function EventExplorerPage() {
         </label>
       </form>
 
-      {data && !data.wired && (
-        <div className="not-wired-banner">
-          <strong>Not yet wired.</strong> {data.reason}
-        </div>
+      {isError && (
+        <p className="error">
+          Could not reach Scenario Service: {(error as Error).message}. Is it running on the
+          configured URL?
+        </p>
       )}
 
       <table>
@@ -102,7 +101,7 @@ export function EventExplorerPage() {
           </tr>
         </thead>
         <tbody>
-          {data?.events.map((event) => (
+          {data?.map((event) => (
             <tr key={event.eventId}>
               <td>{new Date(event.occurredAt).toLocaleString()}</td>
               <td>{event.eventType}</td>
@@ -112,10 +111,10 @@ export function EventExplorerPage() {
               <td>{event.deadLettered ? 'yes' : 'no'}</td>
             </tr>
           ))}
-          {data && data.events.length === 0 && (
+          {data && data.length === 0 && (
             <tr>
               <td colSpan={6} className="hint">
-                {data.wired ? 'No events match these filters.' : 'No data — endpoint not wired yet.'}
+                No events match these filters.
               </td>
             </tr>
           )}
