@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /** docs/openapi/order-service.yaml's /api namespace — the only service that accepts order creation. */
 @RestController
@@ -21,9 +22,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class OrderController {
 
     private final OrderService orderService;
+    private final OrderEventStreamRegistry eventStreamRegistry;
 
-    public OrderController(OrderService orderService) {
+    public OrderController(OrderService orderService, OrderEventStreamRegistry eventStreamRegistry) {
         this.orderService = orderService;
+        this.eventStreamRegistry = eventStreamRegistry;
     }
 
     @PostMapping
@@ -38,6 +41,19 @@ public class OrderController {
                                  @RequestParam(defaultValue = "0") int page,
                                  @RequestParam(defaultValue = "20") int size) {
         return orderService.listOrders(status, customerId, page, size);
+    }
+
+    /**
+     * docs/openapi/order-service.yaml's {@code GET /api/orders/stream}. Declared ahead of
+     * {@link #getOrder} as a matter of readability, matching the OpenAPI note that {@code stream}
+     * is a reserved order id — Spring itself resolves literal path segments ahead of
+     * {@code {orderId}} regardless of declaration order, so this method being first is not what
+     * makes the routing correct, but it documents the intent at the point a future edit could
+     * accidentally break it (see {@code OrderStreamEndpointRoutingTest}).
+     */
+    @GetMapping(path = "/stream", produces = "text/event-stream")
+    public SseEmitter streamOrderEvents(@RequestParam(required = false) String orderId) {
+        return eventStreamRegistry.register(orderId);
     }
 
     @GetMapping("/{orderId}")

@@ -363,6 +363,84 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /demo/events:
+    get:
+      tags: [demo-admin]
+      operationId: listEvents
+      summary: Query the cross-service event projection (Event Explorer)
+      description: |
+        **Phase 5 addition**, made through the coordination protocol in
+        `docs/planning/agent-guidance.md`'s Agent Coordination Rules section — a new, additive path;
+        no existing path or schema in this document changed. Resolves `docs/db-ownership.md`'s
+        "Event Explorer's backing store has no owner yet": Scenario Service already consumes all four
+        domain topics (plus their DLQs) to build scenario-run timelines, so it owns this
+        general-purpose projection too, backed by the `events` table added in the same change. See
+        `docs/agent-reports/phase-5-scenario-service.md` and `docs/CHANGELOG-contracts.md`'s Phase 5
+        entry.
+
+        Every filter is optional and they combine with AND. Only fields the projection can genuinely
+        observe from consuming the record are returned — see `EventRecord`'s own note.
+      parameters:
+        - name: eventType
+          in: query
+          required: false
+          schema:
+            type: string
+          example: OrderCreated
+        - name: aggregateId
+          in: query
+          required: false
+          schema:
+            type: string
+          example: order-21873
+        - name: correlationId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: producer
+          in: query
+          required: false
+          schema:
+            type: string
+          example: inventory-service
+        - name: topic
+          in: query
+          required: false
+          schema:
+            type: string
+          example: inventory.dlq
+        - name: deadLettered
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: A page of projected events, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventRecordPage'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
 components:
   securitySchemes:
     demoToken:
@@ -550,6 +628,74 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ScenarioRunSummary'
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+        totalPages:
+          type: integer
+
+    EventRecord:
+      type: object
+      description: |
+        One physically consumed Kafka record, as projected by Scenario Service's
+        `EventProjectionConsumer` (Phase 5 addition — resolves the Event Explorer's storage gap in
+        `docs/db-ownership.md`). Every field here is genuinely observable by a direct Kafka consumer
+        of the record itself: envelope fields plus the record's own topic/partition/offset, and
+        `producer` from the frozen topic-ownership table in `docs/events/event-catalog.md` §2 (a
+        record on `orders.events` is always published by `order-service`).
+
+        Deliberately does **not** include a "consumed" phase, `durationMs`, or `retryCount`: those
+        live inside each service's own `processed_events` row, which this projection may not read
+        (`docs/db-ownership.md`'s one-owner rule forbids cross-schema queries) — the same honesty rule
+        `ScenarioTimelineEntry.detail` states explicitly.
+      required: [eventId, eventType, eventVersion, occurredAt, correlationId, aggregateId, topic,
+        partition, offset, producer, deadLettered, payload]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        eventType:
+          type: string
+          examples: [OrderCreated]
+        eventVersion:
+          type: integer
+        occurredAt:
+          type: string
+          format: date-time
+        correlationId:
+          type: string
+          format: uuid
+        aggregateId:
+          type: string
+        topic:
+          type: string
+          examples: [orders.events, inventory.dlq]
+        partition:
+          type: integer
+        offset:
+          type: integer
+          format: int64
+        producer:
+          type: string
+          description: Publishing service, or the owning service for a `.dlq` topic (event-catalog.md §2).
+          examples: [order-service, inventory-service]
+        deadLettered:
+          type: boolean
+        payload:
+          type: object
+          additionalProperties: true
+
+    EventRecordPage:
+      type: object
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventRecord'
         page:
           type: integer
         size:

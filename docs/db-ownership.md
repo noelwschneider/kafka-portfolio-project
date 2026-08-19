@@ -40,8 +40,9 @@ queries, separate migration timelines) without running four database containers 
 | `processed_events` (`fulfillment_service` schema) | Fulfillment Service | Idempotency ledger for its own consumers |
 | `scenario_runs` | Scenario Service | One row per scenario run |
 | `scenario_run_timeline` | Scenario Service | Timeline entries for a run |
+| `events` | Scenario Service | Cross-service event projection backing the Event Explorer (Phase 5 addition — see §4's "Event Explorer's backing store has no owner yet") |
 
-14 rows, 5 owners, no table owned twice. `processed_events` is deliberately listed once per owning
+15 rows, 5 owners, no table owned twice. `processed_events` is deliberately listed once per owning
 schema — see §2.
 
 ---
@@ -242,6 +243,37 @@ fabricate these fields. Display only values actually available from the system" 
 offset, and retry count are stored when the runtime knows them and absent when it doesn't, rather
 than defaulted to a plausible-looking zero.
 
+```text
+events
+------
+id              bigserial PK
+event_id        uuid NOT NULL            -- envelope eventId; NOT unique alone (see below)
+event_type      text NOT NULL
+event_version   integer NOT NULL
+occurred_at     timestamptz NOT NULL
+correlation_id  uuid NOT NULL
+aggregate_id    text NOT NULL            -- orderId, per docs/events/event-catalog.md §1
+topic           text NOT NULL
+partition       integer NOT NULL
+offset          bigint NOT NULL
+producer        text NOT NULL            -- publishing service, from the frozen topic-ownership table
+dead_lettered   boolean NOT NULL DEFAULT false
+payload         jsonb NOT NULL
+recorded_at     timestamptz NOT NULL DEFAULT now()
+UNIQUE (topic, partition, offset)
+```
+
+**Phase 5 addition**, made through the coordination protocol — resolves this section's own
+"Event Explorer's backing store has no owner yet" note below. Full rationale, the query endpoint this
+backs, and the honesty tradeoffs made are in `docs/agent-reports/phase-5-scenario-service.md`; the
+one-line summary: Scenario Service already has to consume all four domain topics to build honest
+scenario-run timelines, so it is the natural single owner of the general-purpose event projection too,
+rather than standing up a second consumer of the same four topics. `UNIQUE (topic, partition, offset)`
+— not `event_id` alone — because a DLQ record and the domain record it was dead-lettered from
+legitimately share one `event_id` while being two distinct physical Kafka records; the same tuple also
+makes the projection idempotent against Kafka's own at-least-once redelivery. Migration:
+`services/scenario-service/src/main/resources/db/migration/V2__events.sql`.
+
 ---
 
 ## 4. Boundary notes and open items
@@ -275,7 +307,7 @@ to satisfy tidiness. Prices are demo constants, not business data. Reported as a
 
 There is no currency column anywhere; the project uses a single implicit currency.
 
-### The Event Explorer's backing store has no owner yet
+### The Event Explorer's backing store has no owner yet — resolved in Phase 5
 
 `docs/planning/frontend-design.md`'s Event Explorer needs to query recent events across all services,
 filtered by type, order, correlation ID, service, topic, and dead-lettered status. It suggests "a
@@ -283,10 +315,11 @@ lightweight event projection/audit store", but names no owner, and nothing in th
 `order_status_history` covers only order status changes, and `scenario_run_timeline` covers only
 events that belong to a scenario run.
 
-**Deferred, not resolved.** No table is frozen for it here, because the choice depends on decisions
-Phase 2 has not made yet (whether a projection consumer subscribes to all topics, and whether it
-belongs to Order Service or a separate read-model owner). Whoever builds it must add the table to
-this file and a query endpoint to the relevant OpenAPI spec, via the coordination protocol.
+~~Deferred, not resolved.~~ **Resolved by Phase 5**, once the decisions this was waiting on were
+actually made: Scenario Service consumes all four domain topics (plus their DLQs) to build honest
+scenario-run timelines, so it is the projection's owner — see §3's `events` table above and
+`docs/agent-reports/phase-5-scenario-service.md`. The query endpoint is `GET /demo/events`
+(`docs/openapi/scenario-service.yaml`).
 
 ### Cross-schema references
 

@@ -1,11 +1,13 @@
 package com.orderfulfillment.order;
 
+import com.orderfulfillment.common.CorrelationIdHolder;
 import com.orderfulfillment.common.idempotency.ProcessedEventKey;
 import com.orderfulfillment.common.idempotency.ProcessedEventLedger;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,13 +34,16 @@ class OrderPersistence {
     private final OrderItemRepository orderItemRepository;
     private final OrderStatusHistoryRepository historyRepository;
     private final ProcessedEventLedger processedEventLedger;
+    private final ApplicationEventPublisher eventPublisher;
 
     OrderPersistence(OrderRepository orderRepository, OrderItemRepository orderItemRepository,
-                      OrderStatusHistoryRepository historyRepository, ProcessedEventLedger processedEventLedger) {
+                      OrderStatusHistoryRepository historyRepository, ProcessedEventLedger processedEventLedger,
+                      ApplicationEventPublisher eventPublisher) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.historyRepository = historyRepository;
         this.processedEventLedger = processedEventLedger;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -48,6 +53,7 @@ class OrderPersistence {
         orderRepository.save(order);
         orderItemRepository.saveAll(items);
         historyRepository.save(new OrderStatusHistoryEntity(orderId, OrderStatus.PENDING, null, now));
+        publishStatusChanged(orderId, OrderStatus.PENDING, null, null, now);
         return order;
     }
 
@@ -107,10 +113,24 @@ class OrderPersistence {
     /** Writes one order_status_history row and moves orders.status — docs/order-state-machine.md §3. */
     private OrderEntity writeStatus(String orderId, OrderStatus status, UUID sourceEventId) {
         OrderEntity order = orderRepository.findById(orderId).orElseThrow();
+        OrderStatus previousStatus = order.getStatus();
         Instant now = Instant.now();
         order.setStatus(status);
         order.setUpdatedAt(now);
         historyRepository.save(new OrderStatusHistoryEntity(orderId, status, sourceEventId, now));
+        publishStatusChanged(orderId, status, previousStatus, sourceEventId, now);
         return order;
+    }
+
+    /**
+     * Publishes {@link OrderStatusChangedEvent} for {@link OrderStatusStreamListener} to pick up
+     * once (and only if) this REQUIRES_NEW transaction actually commits — see that class's Javadoc.
+     * Called from inside every write above, never from a listener/controller, so the SSE stream
+     * only ever reports transitions the database durably has.
+     */
+    private void publishStatusChanged(String orderId, OrderStatus status, OrderStatus previousStatus,
+                                       UUID sourceEventId, Instant occurredAt) {
+        eventPublisher.publishEvent(new OrderStatusChangedEvent(
+                orderId, status, previousStatus, sourceEventId, CorrelationIdHolder.get(), occurredAt));
     }
 }

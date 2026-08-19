@@ -31,6 +31,7 @@
         <module>services/inventory-service</module>
         <module>services/payment-service</module>
         <module>services/fulfillment-service</module>
+        <module>services/scenario-service</module>
     </modules>
 
     <dependencyManagement>

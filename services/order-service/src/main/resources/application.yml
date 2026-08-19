@@ -38,6 +38,33 @@ orderfulfillment:
     # same local transaction as the business change). Created by V2__processed_events.sql.
     processed-events-table: order_service.processed_events
 
+management:
+  endpoints:
+    web:
+      exposure:
+        # Narrowly scoped to health only (docs/planning/high-level-design.md §16) — metrics/info are
+        # Phase 9 Observability's concern, not this task's.
+        include: health
+      # Actuator endpoints are served via a separate WebMvcEndpointHandlerMapping that does NOT go
+      # through WebConfig's WebMvcConfigurer#addCorsMappings (that only covers regular
+      # @RestController endpoints) — so the frontend's browser-side calls to /actuator/health were
+      # silently blocked by CORS until this was added, even though curl (which doesn't enforce CORS)
+      # showed the endpoint working fine. Found via live browser verification, not curl.
+      cors:
+        allowed-origin-patterns: "http://localhost:*"
+        allowed-methods: GET
+  endpoint:
+    health:
+      # Adds the liveness/readiness endpoint groups Kubernetes probes actually target
+      # (/actuator/health/liveness, /actuator/health/readiness) per §16.
+      probes:
+        enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
 server:
   port: 8081
 

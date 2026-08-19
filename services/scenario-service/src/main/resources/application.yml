@@ -1,0 +1,72 @@
+spring:
+  application:
+    name: scenario-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/orderfulfillment
+    username: orderfulfillment
+    password: orderfulfillment
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    schemas: scenario_service
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      # Its own consumer group, deliberately never named "order-service"/"inventory-service"/etc, so
+      # this projection never competes for partitions or offsets with a real domain consumer group
+      # (see the class Javadoc on EventProjectionConsumer).
+      group-id: scenario-service-projection
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+
+orderfulfillment:
+  services:
+    order-service: ${ORDER_SERVICE_URL:http://localhost:8081}
+    inventory-service: ${INVENTORY_SERVICE_URL:http://localhost:8082}
+    payment-service: ${PAYMENT_SERVICE_URL:http://localhost:8083}
+    fulfillment-service: ${FULFILLMENT_SERVICE_URL:http://localhost:8084}
+  scenario:
+    # How long Scenario 5 (consumer-outage) leaves the Inventory Service listener paused before
+    # resuming it, long enough for the backlog to be visibly durable in the UI.
+    consumer-outage-pause-ms: 4000
+    # Poll interval while a scenario waits on an order's status via GET /api/orders/{id}, used
+    # because Order Service's own SSE stream (GET /api/orders/stream) was not confirmed ready when
+    # this service was built — see the report's follow-up note.
+    order-poll-interval-ms: 250
+    order-poll-timeout-ms: 20000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+      # Actuator's WebMvcEndpointHandlerMapping bypasses WebConfig's regular CORS mapping — without
+      # this, browser calls to /actuator/health are blocked even though curl works fine.
+      cors:
+        allowed-origin-patterns: "http://localhost:*"
+        allowed-methods: GET
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
+server:
+  port: 8085
+
+logging:
+  level:
+    com.orderfulfillment: INFO

@@ -25,7 +25,8 @@ class PaymentServiceTest {
         repository = mock(PaymentAttemptRepository.class);
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         behaviorStore = new PaymentBehaviorStore();
-        IdGenerator idGenerator = new IdGenerator();
+        IdGenerator idGenerator = mock(IdGenerator.class);
+        when(idGenerator.nextPaymentId()).thenAnswer(invocation -> "pay-" + UUID.randomUUID());
         // These unit tests exercise the no-event-key overload, which never touches the ledger.
         ProcessedEventLedger processedEventLedger = mock(ProcessedEventLedger.class);
         paymentService = new PaymentService(repository, behaviorStore, idGenerator, processedEventLedger);

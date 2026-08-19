@@ -1,5 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getOrder, type OrderDetail } from '../api/orders';
+import { ORDER_SERVICE_BASE_URL, subscribeToStream } from '../api/client';
 import { StatusBadge } from '../components/StatusBadge';
 
 interface Props {
@@ -16,26 +18,86 @@ const TERMINAL_STATUSES = new Set([
   'FAILED',
 ]);
 
+// docs/openapi/order-service.yaml's GET /api/orders/stream: one `order-status-changed` SSE event
+// per lifecycle transition. Message schema isn't frozen (Phase 0 only froze the endpoint/content
+// type/event name), so this is read defensively and only used to know *that* something changed —
+// the actual order is always re-fetched from GET /api/orders/{id}, never reconstructed from the
+// SSE payload alone.
+interface OrderStatusChangedMessage {
+  orderId?: string;
+  status?: string;
+  previousStatus?: string;
+  eventId?: string | null;
+  correlationId?: string;
+  occurredAt?: string;
+}
+
+type StreamState = 'connecting' | 'live' | 'unavailable';
+
 export function OrderDetailPage({ orderId, onBack }: Props) {
+  const queryClient = useQueryClient();
+  const [streamState, setStreamState] = useState<StreamState>('connecting');
+  const [lastLiveEvent, setLastLiveEvent] = useState<OrderStatusChangedMessage | null>(null);
+  const fellBackRef = useRef(false);
+
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['order', orderId],
     queryFn: () => getOrder(orderId),
-    // Phase 2: the order now travels through Kafka asynchronously after POST /api/orders returns
-    // PENDING, so this poll is what actually surfaces the state transitions to the user — not just
-    // a demo-recovery convenience like it was in Phase 1. Polls at 1s while non-terminal, then
-    // stops once the order reaches a terminal state (docs/order-state-machine.md §1). SSE
-    // (GET /api/orders/stream) replaces this in Phase 5; not implemented yet.
+    // Primary live-update mechanism is now the SSE stream below (Phase 5's "add SSE/live updates"
+    // goal). This poll is kept only as a fallback for when the stream never opens or drops
+    // permanently, so the page still self-heals against a backend that doesn't support SSE yet.
     refetchInterval: (query) => {
       const status = (query.state.data as OrderDetail | undefined)?.status;
-      return status && TERMINAL_STATUSES.has(status) ? false : 1000;
+      if (status && TERMINAL_STATUSES.has(status)) return false;
+      return streamState === 'live' ? false : 1000;
     },
   });
+
+  useEffect(() => {
+    setStreamState('connecting');
+    fellBackRef.current = false;
+
+    const url = `${ORDER_SERVICE_BASE_URL}/api/orders/stream?orderId=${encodeURIComponent(orderId)}`;
+    const unsubscribe = subscribeToStream(
+      url,
+      {
+        onOpen: () => setStreamState('live'),
+        onMessage: (_name, raw) => {
+          setStreamState('live');
+          try {
+            const message = JSON.parse(raw) as OrderStatusChangedMessage;
+            setLastLiveEvent(message);
+          } catch {
+            // Malformed payload — still a signal the connection is live; refetch anyway.
+          }
+          queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+        },
+        onError: () => {
+          // EventSource retries on its own; if it never recovers the poll above keeps the page
+          // correct, just less instantly. We don't tear the connection down here.
+          if (!fellBackRef.current) {
+            fellBackRef.current = true;
+            setStreamState('unavailable');
+          }
+        },
+      },
+      ['order-status-changed'],
+    );
+
+    return unsubscribe;
+  }, [orderId, queryClient]);
 
   return (
     <section>
       <div className="page-header">
         <h1>Order detail</h1>
         <button onClick={onBack}>Back to orders</button>
+      </div>
+
+      <div className={`stream-indicator stream-${streamState}`}>
+        {streamState === 'live' && 'Live — updates via SSE'}
+        {streamState === 'connecting' && 'Connecting to live updates…'}
+        {streamState === 'unavailable' && 'Live stream unavailable — falling back to polling'}
       </div>
 
       {isLoading && <p>Loading order…</p>}
@@ -57,6 +119,13 @@ export function OrderDetailPage({ orderId, onBack }: Props) {
               <dd>{new Date(data.updatedAt).toLocaleString()}</dd>
             </dl>
           </div>
+
+          {lastLiveEvent && (
+            <p className="stream-last-event">
+              Last live update: {lastLiveEvent.previousStatus ?? '?'} → {lastLiveEvent.status ?? '?'}
+              {lastLiveEvent.occurredAt ? ` at ${new Date(lastLiveEvent.occurredAt).toLocaleTimeString()}` : ''}
+            </p>
+          )}
 
           <h3>Items</h3>
           <table>

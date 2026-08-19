@@ -1,0 +1,12 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    schemas: scenario_service
+
+orderfulfillment:
+  scenario:
+    consumer-outage-pause-ms: 1500
+    order-poll-interval-ms: 100
+    order-poll-timeout-ms: 15000

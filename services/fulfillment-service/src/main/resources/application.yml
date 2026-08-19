@@ -34,6 +34,26 @@ orderfulfillment:
     # same local transaction as the business change). Created by V2__processed_events.sql.
     processed-events-table: fulfillment_service.processed_events
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+      # Actuator's WebMvcEndpointHandlerMapping bypasses WebConfig's regular CORS mapping — without
+      # this, browser calls to /actuator/health are blocked even though curl works fine.
+      cors:
+        allowed-origin-patterns: "http://localhost:*"
+        allowed-methods: GET
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
 server:
   port: 8084
 
