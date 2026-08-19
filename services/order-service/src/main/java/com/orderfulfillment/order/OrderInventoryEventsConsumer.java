@@ -77,6 +77,7 @@ public class OrderInventoryEventsConsumer {
             return;
         }
 
+        log.info("Processing InventoryReserved {} for order {}", envelope.eventId(), orderId);
         // PaymentRequested is recorded in the outbox by that same transaction (ADR-006 + the method's
         // Javadoc), so there is nothing left to publish here — and, crucially, no window in which
         // this consumer could have committed the processed_events claim without the event.
@@ -96,6 +97,7 @@ public class OrderInventoryEventsConsumer {
             return;
         }
 
+        log.info("Processing InventoryReservationFailed {} for order {}", envelope.eventId(), orderId);
         persistence.appendStatus(orderId, OrderStatus.REJECTED_OUT_OF_STOCK, envelope.eventId(), eventKey);
     }
 }

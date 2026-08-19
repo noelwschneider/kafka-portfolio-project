@@ -80,6 +80,7 @@ public class InventoryOrderEventsConsumer {
 
         OrderCreatedPayload payload = eventCodec.payloadAs(envelope, OrderCreatedPayload.class);
         String orderId = payload.orderId();
+        log.info("Processing OrderCreated {} for order {}", envelope.eventId(), orderId);
         List<OrderLine> lines = payload.items().stream()
                 .map(i -> new OrderLine(i.sku(), i.quantity())).toList();
 

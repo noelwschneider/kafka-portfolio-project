@@ -73,6 +73,7 @@ public class InventoryPaymentEventsConsumer {
 
         PaymentRejectedPayload payload = eventCodec.payloadAs(envelope, PaymentRejectedPayload.class);
         String orderId = payload.orderId();
+        log.info("Processing PaymentRejected {} for order {}", envelope.eventId(), orderId);
 
         ReleaseResult result = inventoryService.release(orderId, eventKey);
         if (result.duplicate()) {

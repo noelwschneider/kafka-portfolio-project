@@ -22,9 +22,10 @@ From the repo root:
 docker compose up -d --build
 ```
 
-This builds and starts all 7 containers: Postgres, Kafka (single-node KRaft), the five backend
-services (order, inventory, payment, fulfillment, scenario), and the frontend. First build takes a
-few minutes (five separate Maven builds); subsequent runs reuse Docker's layer cache.
+This builds and starts all 9 containers: Postgres, Kafka (single-node KRaft), the five backend
+services (order, inventory, payment, fulfillment, scenario), the frontend, and Prometheus + Grafana
+(Phase 9's observability stack). First build takes a few minutes (five separate Maven builds);
+subsequent runs reuse Docker's layer cache.
 
 Check everything came up healthy:
 
@@ -32,14 +33,13 @@ Check everything came up healthy:
 docker compose ps
 ```
 
-Each backend service exposes a health endpoint on the host:
+Each backend service exposes health, metrics, and Prometheus endpoints on the host:
 
 ```bash
-curl http://localhost:8081/actuator/health   # order-service
-curl http://localhost:8082/actuator/health   # inventory-service
-curl http://localhost:8083/actuator/health   # payment-service
-curl http://localhost:8084/actuator/health   # fulfillment-service
-curl http://localhost:8085/actuator/health   # scenario-service
+curl http://localhost:8081/actuator/health       # order-service
+curl http://localhost:8081/actuator/metrics      # Micrometer metric names
+curl http://localhost:8081/actuator/prometheus   # Prometheus scrape format
+# same three paths on :8082 (inventory), :8083 (payment), :8084 (fulfillment), :8085 (scenario)
 ```
 
 Then open the frontend:
@@ -49,6 +49,31 @@ Then open the frontend:
 That's the lab's UI — an Overview page showing live service health, an Orders view, a Scenarios
 page for triggering the reproducible failure/reliability demos, and an Event Explorer for watching
 the Kafka events those scenarios actually produce (real requests and real events, not an animation).
+
+### Metrics dashboards (Grafana)
+
+**http://localhost:3000** — Grafana, provisioned with a Prometheus datasource
+(**http://localhost:9090**, itself scraping all 5 backend services' `/actuator/prometheus` every
+5s) and one dashboard ("Order Fulfillment Systems Lab — Overview": request rate, average latency,
+Kafka consumer throughput, and JVM heap, per service). Anonymous viewer access is enabled, so the
+dashboard is visible without logging in; the `admin`/`admin` credentials (dev-only, same posture
+as this project's other local-only default credentials) are only needed to edit it.
+
+### Tracing a scenario across services by correlation id
+
+Every request/event in this system carries a `correlationId` (`X-Correlation-Id` HTTP header, or
+generated fresh if absent — see `CorrelationIdFilter`/`CorrelationIdHolder` in `services/common`).
+Every backend service logs structured JSON (Spring Boot's native ECS format —
+`docs/adr/ADR-008-native-structured-logging.md`) with that id attached to every line logged while
+handling that request or event. Trigger a scenario, grab its `correlationId` from the response,
+then:
+
+```bash
+docker compose logs order-service inventory-service payment-service fulfillment-service scenario-service \
+  | grep <correlation-id>
+```
+
+finds every hop of that workflow across all 5 services, in order.
 
 Tear the stack down when you're done:
 

@@ -65,6 +65,7 @@ public class OrderFulfillmentEventsConsumer {
             return;
         }
 
+        log.info("Processing ShipmentCreated {} for order {}", envelope.eventId(), orderId);
         persistence.appendStatus(orderId, OrderStatus.FULFILLED, envelope.eventId(), eventKey);
     }
 }

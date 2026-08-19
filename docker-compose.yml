@@ -194,5 +194,46 @@ services:
       scenario-service:
         condition: service_healthy
 
+  # Phase 9 Observability stretch goal (docs/planning/high-level-design.md's Observability
+  # section lists this as the "Stronger later version" — optional, added here because there was
+  # comfortable room left after the required correlation-id/metrics work). Scrapes each backend
+  # service's /actuator/prometheus (micrometer-registry-prometheus, added this phase).
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    container_name: orderfulfillment-prometheus
+    volumes:
+      - ./infrastructure/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      order-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
+      fulfillment-service:
+        condition: service_healthy
+      scenario-service:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: orderfulfillment-grafana
+    environment:
+      # Dev-only credentials, same pattern as Postgres's trivial dev password elsewhere in this
+      # file — not protecting anything sensitive, just standing up the primitive correctly.
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./infrastructure/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infrastructure/observability/grafana/dashboards:/etc/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
 volumes:
   orderfulfillment-postgres-data:

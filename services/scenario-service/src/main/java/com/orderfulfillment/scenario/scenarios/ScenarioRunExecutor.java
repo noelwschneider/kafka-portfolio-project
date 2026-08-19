@@ -49,7 +49,13 @@ public class ScenarioRunExecutor {
         ScenarioRunContext ctx =
                 new ScenarioRunContext(runId, correlationId, orderId -> setPrimaryOrderId(runId, orderId));
         try {
-            CorrelationIdHolder.runInScope(correlationId, () -> runner.run(ctx));
+            CorrelationIdHolder.runInScope(correlationId, () -> {
+                // Phase 9: this is where a scenario's correlationId is minted — logged here, inside
+                // the scope, so it's the first line of the trace a human would grep for across all
+                // 5 services' logs.
+                log.info("Starting scenario run {} ({})", runId, scenarioName);
+                runner.run(ctx);
+            });
             complete(runId, scenarioName, correlationId, ScenarioRunStatus.COMPLETED, null);
         } catch (Exception e) {
             log.warn("Scenario run {} ({}) failed", runId, scenarioName, e);

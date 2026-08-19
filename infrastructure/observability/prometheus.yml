@@ -1,0 +1,28 @@
+# Phase 9 Observability stretch goal. Scrapes each backend service's /actuator/prometheus
+# endpoint (exposed by micrometer-registry-prometheus, added this phase) on the Compose
+# network, where service names resolve as DNS hostnames.
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: order-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["order-service:8081"]
+  - job_name: inventory-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["inventory-service:8082"]
+  - job_name: payment-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["payment-service:8083"]
+  - job_name: fulfillment-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["fulfillment-service:8084"]
+  - job_name: scenario-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["scenario-service:8085"]

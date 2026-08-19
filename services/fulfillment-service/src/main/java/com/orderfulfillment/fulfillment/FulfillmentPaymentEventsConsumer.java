@@ -73,6 +73,7 @@ public class FulfillmentPaymentEventsConsumer {
 
         PaymentAuthorizedPayload payload = eventCodec.payloadAs(envelope, PaymentAuthorizedPayload.class);
         String orderId = payload.orderId();
+        log.info("Processing PaymentAuthorized {} for order {}", envelope.eventId(), orderId);
 
         ShipmentCreationResult result = fulfillmentService.createShipment(orderId, eventKey);
         if (result.duplicate()) {

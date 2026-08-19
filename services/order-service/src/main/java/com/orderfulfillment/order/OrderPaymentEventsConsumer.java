@@ -69,6 +69,7 @@ public class OrderPaymentEventsConsumer {
             return;
         }
 
+        log.info("Processing PaymentAuthorized {} for order {}", envelope.eventId(), orderId);
         persistence.appendPaymentAuthorizedTransition(orderId, envelope.eventId(), eventKey);
         // Nothing to publish here either way: Fulfillment Service consumes PaymentAuthorized
         // directly off payments.events, independent of Order Service's own consumption of it.
@@ -85,6 +86,7 @@ public class OrderPaymentEventsConsumer {
             return;
         }
 
+        log.info("Processing PaymentRejected {} for order {}", envelope.eventId(), orderId);
         persistence.appendStatus(orderId, OrderStatus.PAYMENT_FAILED, envelope.eventId(), eventKey);
         // No event published here: Inventory Service independently consumes PaymentRejected off
         // payments.events for its own compensation step (event-catalog.md §3 — Consumed by: Order

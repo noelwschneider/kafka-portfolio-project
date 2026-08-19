@@ -1,6 +1,7 @@
 package com.orderfulfillment.order;
 
 import com.orderfulfillment.common.kafka.KafkaTopics;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.time.Instant;
@@ -86,10 +87,16 @@ class OutboxDispatcher {
         int published = 0;
         for (OutboxEventEntity row : pending) {
             try {
-                kafkaTemplate.send(KafkaTopics.ORDERS_EVENTS, row.getAggregateId(), wireForm(row.getPayload()))
+                JsonNode envelopeNode = objectMapper.readTree(row.getPayload());
+                kafkaTemplate.send(KafkaTopics.ORDERS_EVENTS, row.getAggregateId(), wireForm(envelopeNode))
                         .get(sendTimeoutMs, TimeUnit.MILLISECONDS);
                 row.markPublished(Instant.now());
                 published++;
+                // Phase 9: this tick can batch rows from several unrelated workflows, so there is no
+                // single correlationId to bind to MDC for the whole loop — logged explicitly per row,
+                // read straight out of the envelope that was actually sent, instead.
+                log.info("Published {} for order {} (correlationId={})", row.getEventType(), row.getAggregateId(),
+                        envelopeNode.path("correlationId").asText(null));
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
                 break;
@@ -119,8 +126,8 @@ class OutboxDispatcher {
      * in the envelope, including eventId/occurredAt/correlationId, is still exactly what the
      * business transaction committed.
      */
-    private String wireForm(String storedPayload) {
-        return objectMapper.writeValueAsString(objectMapper.readTree(storedPayload));
+    private String wireForm(JsonNode envelopeNode) {
+        return objectMapper.writeValueAsString(envelopeNode);
     }
 
     private boolean expired(OutboxEventEntity row) {

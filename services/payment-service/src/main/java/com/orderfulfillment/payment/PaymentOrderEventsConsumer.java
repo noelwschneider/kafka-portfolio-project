@@ -73,6 +73,7 @@ public class PaymentOrderEventsConsumer {
 
         PaymentRequestedPayload payload = eventCodec.payloadAs(envelope, PaymentRequestedPayload.class);
         String orderId = payload.orderId();
+        log.info("Processing PaymentRequested {} for order {}", envelope.eventId(), orderId);
 
         PaymentOutcome outcome =
                 paymentService.authorize(orderId, payload.amount(), payload.idempotencyKey(), eventKey);

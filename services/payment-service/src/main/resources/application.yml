@@ -35,7 +35,10 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        # Phase 9 Observability: metrics added to the previously health-only exposure
+        # (docs/planning/high-level-design.md's Observability section requires
+        # health/metrics/info).
+        include: health,metrics,prometheus
       # Actuator's WebMvcEndpointHandlerMapping bypasses WebConfig's regular CORS mapping — without
       # this, browser calls to /actuator/health are blocked even though curl works fine.
       cors:
@@ -57,3 +60,12 @@ server:
 logging:
   level:
     com.orderfulfillment: INFO
+  # Phase 9 Observability: Spring Boot 4.1's native structured logging (no extra dependency —
+  # see docs/adr/ADR-008-native-structured-logging.md). ECS maps spring.application.name to a
+  # top-level service.name field and puts SLF4J MDC entries (CorrelationIdFilter/
+  # CorrelationIdHolder put correlationId there for every HTTP request and every
+  # @KafkaListener thread) under labels.*, so `docker compose logs <service> | grep
+  # <correlation-id>` finds a workflow's hops across all 5 services.
+  structured:
+    format:
+      console: ecs
