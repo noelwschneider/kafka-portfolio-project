@@ -22,7 +22,7 @@ From the repo root:
 docker compose up -d --build
 ```
 
-This builds and starts all 9 containers: Postgres, Kafka (single-node KRaft), the five backend
+This builds and starts all 10 containers: Postgres, Kafka (single-node KRaft), the five backend
 services (order, inventory, payment, fulfillment, scenario), the frontend, and Prometheus + Grafana
 (Phase 9's observability stack). First build takes a few minutes (five separate Maven builds);
 subsequent runs reuse Docker's layer cache.
@@ -129,8 +129,11 @@ Kafka is configured with two listeners so both workflows above work against the 
   Docker Compose network, where `localhost` would otherwise resolve to the calling container
   itself rather than the broker.
 
-See `docs/agent-reports/phase-7-containerization.md` for why a single `PLAINTEXT://localhost:9092`
-listener (the pre-Phase-7 config) breaks once services run as separate containers.
+(That's why a single `PLAINTEXT://localhost:9092` listener, the pre-Phase-7 config, stopped working
+once services moved into separate containers: `localhost` inside a container resolves to that
+container itself, not the broker. Deeper rationale lives in this author's local, gitignored
+`docs/agent-reports/phase-7-containerization.md` working notes — not tracked in git, so it won't be
+present in a fresh clone.)
 
 ## Run the whole stack in Kubernetes (local `kind`)
 
@@ -194,13 +197,30 @@ Prerequisites: `kind` (`brew install kind`) and `kubectl`, plus Docker (already 
    kind delete cluster --name orderfulfillment
    ```
 
-See `docs/agent-reports/phase-8-kubernetes.md` for the manifest inventory, resource-sizing
-reasoning, the Ingress-vs-NodePort call, and a live readiness-vs-liveness demonstration (including
-a real finding: this app has no Kafka Actuator health indicator registered at all, so the
-demonstration uses a Postgres outage instead, and the backend ConfigMaps add
+A real finding from bringing this up: this app has no Kafka Actuator health indicator registered at
+all, so readiness can't reflect a Kafka outage directly. The backend ConfigMaps add
 `MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE=readinessState,db` — a manifest-level property
-override, no application source touched — to make readiness actually reflect that dependency; see
-that report for the full explanation and live numbers).
+override, no application source touched — so readiness at least reflects the Postgres dependency,
+and a Postgres outage (rather than a Kafka one) is what actually demonstrates the
+readiness-vs-liveness distinction live. Deeper manifest inventory and resource-sizing notes live in
+this author's local, gitignored `docs/agent-reports/phase-8-kubernetes.md` — not tracked in git, so
+it won't be present in a fresh clone.
+
+Manual horizontal scaling of a backend service (rather than the frontend or one-off jobs) is worth
+trying directly against the running consumer groups:
+
+```bash
+kubectl scale deployment/inventory-service --replicas=2 -n orderfulfillment
+```
+
+then trigger Scenario 8 (High-Volume Batch, `POST /demo/scenarios/high-volume`) and watch consumer
+lag on `inventory-service`'s `orders.events` group change as replica count changes — this is the
+mechanism behind Kafka consumer-group parallelism, not a simulation. No `HorizontalPodAutoscaler` is
+configured; scaling here is manual (`kubectl scale`), which is enough to demonstrate the mechanism.
+On this project's own development machine, only 1 and 2 Inventory Service replicas were actually
+measured — a 3rd replica hit a local Docker Desktop VM resource ceiling (CPU/memory contention
+across the whole cluster's pods, not a defect in the manifests or the scaling mechanism itself) and
+was not obtained. Your hardware may do better.
 
 ## Running tests
 
@@ -213,3 +233,38 @@ mvn -pl services/order-service test
 # or, for every module:
 mvn test
 ```
+
+## What this project demonstrates
+
+Verified against the implementation as of this writing, not aspirational (`docs/planning/agent-guidance.md`
+rule 18 — no claim here is stronger than what's actually built):
+
+- Designed and built an event-driven order fulfillment platform (Java 21, Spring Boot, Apache Kafka,
+  PostgreSQL, React/TypeScript) that separates inventory, payment, and fulfillment workflows into
+  independently deployable services communicating only through asynchronous domain events — no
+  synchronous service-to-service REST calls in the workflow (ADR-002, `docs/architecture-diagram.md`).
+- Implemented idempotent Kafka consumers (a per-service `processed_events` ledger, ADR-005), bounded
+  retry with backoff, dead-letter routing on exhausted retries, and correlation-ID-based tracing
+  across all five services (ADR-008) to make asynchronous failures diagnosable rather than silent.
+- Designed concurrent inventory reservation logic, backed by integration tests, that prevents
+  overselling under competing concurrent order requests.
+- Implemented a transactional outbox in Order Service (ADR-006) to close the database/Kafka
+  dual-write gap for that service's own event publication — durable, not exactly-once; the same gap
+  is documented, not hidden, as still open in the other three services.
+- Found and fixed a real out-of-order-delivery correctness bug (ADR-009): two independently-consumed
+  Kafka topics writing the same order's status could interleave and corrupt its state under load.
+  Fixed with an explicit state-transition guard, a deferred-transition queue, and per-order
+  serialization — reproduced deterministically in an integration test before and after the fix.
+- Containerized all five backend services and the frontend (Docker), and deployed them to Kubernetes
+  (`kind`) with Deployments, Services, ConfigMaps, Secrets, and readiness/liveness probes wired to
+  each service's actual dependencies. Demonstrated manual horizontal scaling of a Kafka consumer
+  group (`kubectl scale`) with real, measured throughput and consumer-lag numbers at 1 and 2
+  replicas — no `HorizontalPodAutoscaler` is configured, so "scalable" here means the manifests and
+  consumer-group mechanics support it, demonstrated manually, not that autoscaling is implemented.
+- Built an interactive engineering console (React/TypeScript) that triggers these scenarios as real
+  HTTP requests against the running services and visualizes actual resulting state, Kafka events,
+  and SSE-pushed status changes — not a frontend animation (rule 10).
+
+Not yet built, stated plainly rather than left implicit: CI/CD (no GitHub Actions workflow exists in
+this repo despite being an originally pinned-stack goal), and a `HorizontalPodAutoscaler` for
+automatic (as opposed to manual) scaling.

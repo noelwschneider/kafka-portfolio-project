@@ -1,8 +1,10 @@
 import { MermaidDiagram } from '../components/MermaidDiagram';
 
 // frontend-design.md §12.7. Diagram source and prose below are transcribed from
-// docs/architecture-diagram.md (read-only per this phase's rules — flag, don't edit) so a reviewer
-// gets the same picture here as in the repo's own docs, rendered rather than left as a link.
+// docs/architecture-diagram.md so a reviewer gets the same picture here as in the repo's own docs,
+// rendered rather than left as a link. Keep the two in sync when either changes (Phase 11 polish
+// pass found this page had drifted badly out of date behind Phases 7-10 and ADR-009 — check both
+// files together from now on).
 const SYSTEM_OVERVIEW_DIAGRAM = `flowchart TB
     UI["React / TypeScript console<br/>Vite + TanStack Query + EventSource"]
 
@@ -218,16 +220,27 @@ export function ArchitecturePage() {
 
       <h2>Why Kubernetes</h2>
       <p>
-        <strong>Not yet built.</strong> Per ADR-007, Kubernetes is introduced only once the local
-        service boundaries (four services + Scenario Service, Phase 3) have stabilized —
-        Kubernetes is a deployment/scaling concern layered on top of an already-correct system, not
-        a prerequisite for developing it (<code>docs/planning/agent-guidance.md</code> rule 19:
-        "Do not make Kubernetes a prerequisite for early local development"). The plan for when it
-        does land (Phase 7+, per <code>docs/planning/implementation-phases.md</code>): one
-        Deployment per service, readiness/liveness probes backed by each service's Actuator health
-        endpoints, and an HPA on Order/Inventory Service to make Scenario 8 (High-Volume Batch)
-        demonstrate real horizontal scaling under load — none of that exists in the running system
-        today.
+        Per ADR-007, Kubernetes was introduced only once the local service boundaries (four
+        services + Scenario Service, Phase 3) had stabilized — it's a deployment/scaling concern
+        layered on top of an already-correct system, not a prerequisite for developing it
+        (<code>docs/planning/agent-guidance.md</code> rule 19: "Do not make Kubernetes a
+        prerequisite for early local development"). It landed in Phase 8: one Deployment and
+        Service per backend service and the frontend, ConfigMaps and Secrets for configuration,
+        and readiness/liveness probes backed by each service's Actuator health endpoints, all as
+        plain YAML manifests (no Helm) targeting local <code>kind</code>.
+      </p>
+      <p>
+        <strong>Scaling is manual, not automatic.</strong> No <code>HorizontalPodAutoscaler</code> is
+        configured — Phase 10's high-volume scenario (Scenario 8) demonstrates the underlying
+        mechanism with <code>kubectl scale deployment/inventory-service --replicas=N</code> instead.
+        Real measurements exist at 1 and 2 Inventory Service replicas (submission throughput and
+        Kafka consumer-lag both observed to change with replica count, on the live cluster, not
+        simulated). A 3rd replica was attempted repeatedly but not obtained on this project's own
+        development hardware — a local Docker Desktop VM resource ceiling under concurrent JVM pod
+        load, not a defect in the manifests or the scaling mechanism. The topic's 3-partition
+        ceiling means a working replica=3 run is architecturally expected to help, and a 4th
+        replica is expected to help no further — stated as the documented expectation, not a
+        measured result.
       </p>
 
       <h2>Reliability notes</h2>
@@ -256,7 +269,20 @@ export function ArchitecturePage() {
         itself: those publishes happen after a transaction that already claimed the{' '}
         <code>processed_events</code> row for the event being handled, so a redelivery is skipped as
         a duplicate rather than republishing. Closing it for those three is not done, and the
-        architecture claims above apply to Order Service only.
+        outbox claims above apply to Order Service only.
+      </p>
+      <p>
+        <strong>Order Service's own status is guarded against cross-topic reordering (ADR-009).</strong>{' '}
+        <code>PaymentAuthorized</code> and <code>ShipmentCreated</code> are consumed by Order Service
+        on independent listeners with no ordering guarantee between the two topics, and under load
+        the later-in-the-workflow event can be processed first — a real defect found live during
+        Phase 10's load testing, where it corrupted order state under concurrency. Every write is
+        now classified against <code>docs/order-state-machine.md</code>'s frozen transition table
+        before being applied: an early transition is parked in a <code>deferred_transitions</code> table
+        and applied once its predecessor lands, and a transition the order already passed is
+        dropped. <code>orders.status</code> only ever holds a status reachable by a valid transition
+        sequence and never reverts out of a terminal state — reproduced and verified by a
+        deterministic integration test, not just documentation intent.
       </p>
 
       <h2>Repository documentation</h2>
@@ -266,7 +292,7 @@ export function ArchitecturePage() {
         <li><code>docs/events/event-catalog.md</code> — event envelope, topics, publisher/consumer map</li>
         <li><code>docs/order-state-machine.md</code> — order status transitions</li>
         <li><code>docs/db-ownership.md</code> — per-service schema ownership</li>
-        <li><code>docs/adr/</code> — architecture decision records (ADR-001 through ADR-007)</li>
+        <li><code>docs/adr/</code> — architecture decision records (ADR-001 through ADR-009)</li>
         <li><code>docs/reliability-pattern.md</code> — idempotency/retry/DLQ implementation detail</li>
       </ul>
     </section>

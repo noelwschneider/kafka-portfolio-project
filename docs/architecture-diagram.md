@@ -35,7 +35,7 @@ flowchart TB
     end
 
     subgraph pg["PostgreSQL — one schema per service"]
-        S_ORD["order_service<br/>orders, order_items,<br/>order_status_history,<br/>outbox_events, processed_events"]
+        S_ORD["order_service<br/>orders, order_items,<br/>order_status_history,<br/>outbox_events, deferred_transitions,<br/>processed_events"]
         S_INV["inventory_service<br/>inventory_items,<br/>inventory_reservations,<br/>processed_events"]
         S_PAY["payment_service<br/>payment_attempts,<br/>processed_events"]
         S_FUL["fulfillment_service<br/>shipments,<br/>processed_events"]
@@ -242,3 +242,15 @@ Stated plainly so no diagram above is read as promising more than the implementa
   background publisher sends them and marks them published. That makes Order Service's publication
   durable, not exactly-once: a crash between the send and the mark resends the row, which the
   idempotent consumers above absorb.
+- **Order Service's own aggregate status is guarded against cross-topic reordering (ADR-009).**
+  `PaymentAuthorized` (`payments.events`) and `ShipmentCreated` (`fulfillment.events`) are consumed
+  by Order Service on independent listeners with no ordering guarantee between the two topics, and
+  under load the later-in-the-workflow event can be processed first. Order Service now classifies
+  every write against `docs/order-state-machine.md`'s frozen transition table before applying it: a
+  transition that arrives too early is parked in `deferred_transitions` and applied once its
+  predecessor lands, and a transition the order has already passed is dropped. The result —
+  `orders.status` only ever holds a status reachable by a valid transition sequence, and never
+  reverts out of a terminal state — is a real, tested guarantee (an integration test reproduces the
+  original race deterministically), not merely a documentation intent. It does not make delivery
+  exactly-once; it makes the aggregate's *observed* status sequence always valid even though the
+  underlying events can still arrive out of order.
