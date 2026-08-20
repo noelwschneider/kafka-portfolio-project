@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Shared error envelope from docs/planning/high-level-design.md's API Error Model section,
+ * Shared error envelope from docs/planning/sprint-1/high-level-design.md's API Error Model section,
  * mirrored by every service's ApiError schema in docs/openapi/*.yaml.
  */
 public record ApiError(

@@ -36,7 +36,7 @@ public class DemoResetService {
 
     private static final Logger log = LoggerFactory.getLogger(DemoResetService.class);
 
-    /** docs/planning/backend-design.md's Seed Data section / docs/db-ownership.md's price table. */
+    /** docs/planning/sprint-1/backend-design.md's Seed Data section / docs/db-ownership.md's price table. */
     private static final Map<String, Integer> SEED_QUANTITIES = new LinkedHashMap<>();
 
     static {

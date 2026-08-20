@@ -4,7 +4,7 @@ Changes to the **frozen** Phase 0 contracts — `docs/openapi/`, `docs/events/`,
 `docs/order-state-machine.md`, `docs/db-ownership.md`, `docs/scenarios.md`, `docs/adr/`,
 `docs/architecture-diagram.md` — after they were frozen.
 
-Why this file exists: `docs/planning/execution-plan.md` §5 rule 3 — *"Contract changes after fan-out
+Why this file exists: `docs/planning/sprint-1/execution-plan.md` §5 rule 3 — *"Contract changes after fan-out
 has begun require a brief broadcast (e.g., a note in `docs/CHANGELOG-contracts.md`) so other
 in-flight workstreams know to re-check their assumptions before merging."* An entry here is the
 broadcast. If you are picking up in-flight work, read the entries dated after your branch point.

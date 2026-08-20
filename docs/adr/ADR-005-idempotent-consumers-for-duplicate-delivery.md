@@ -16,13 +16,13 @@ consequence of ordinary events:
 
 The consequences are concrete and bad: a second reservation for the same order silently oversells
 stock, a second authorization double-charges, a second shipment ships twice. And
-`docs/planning/frontend-design.md`'s Scenario 4 promises a reviewer that a genuinely duplicated event
+`docs/planning/sprint-1/frontend-design.md`'s Scenario 4 promises a reviewer that a genuinely duplicated event
 produces no duplicate side effect — a claim that has to be true, and visibly so.
 
 ## Decision
 
 Every consumer is idempotent, using the `processed_events` ledger described in
-`docs/planning/backend-design.md`'s Idempotent consumers section:
+`docs/planning/sprint-1/backend-design.md`'s Idempotent consumers section:
 
 ```text
 processed_events

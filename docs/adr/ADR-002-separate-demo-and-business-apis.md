@@ -33,7 +33,7 @@ Concretely:
 
 - A dedicated **Scenario Service** owns scenario orchestration
   (`docs/openapi/scenario-service.yaml`), the long-term direction recommended by
-  `docs/planning/backend-design.md` 4.6.
+  `docs/planning/sprint-1/backend-design.md` 4.6.
 - Where a control must live inside the service it affects — pausing a listener, configuring the
   payment simulator — it lives under that service's `/demo` prefix, in a separate controller from
   anything under `/api` (`docs/openapi/inventory-service.yaml`,
@@ -42,7 +42,7 @@ Concretely:
   order with the same `POST /api/orders` any client uses; only the simulator's configured behavior
   differs.
 - `/demo` endpoints can be disabled or protected by a simple demo configuration
-  (`docs/planning/high-level-design.md`'s Security Scope section) without touching `/api`.
+  (`docs/planning/sprint-1/high-level-design.md`'s Security Scope section) without touching `/api`.
 
 ## Alternatives considered
 
@@ -69,7 +69,7 @@ product — so compiling them out is not actually what is wanted.
 **Accepted costs.**
 
 - Scenario Service calls other services synchronously over HTTP, which
-  `docs/planning/implementation-phases.md`'s Phase 3 otherwise advises against. Justified as control
+  `docs/planning/sprint-1/implementation-phases.md`'s Phase 3 otherwise advises against. Justified as control
   plane rather than workflow: no order transition depends on those calls, and a scenario has to be
   able to report a deterministic start. Documented at the top of
   `docs/openapi/scenario-service.yaml`.

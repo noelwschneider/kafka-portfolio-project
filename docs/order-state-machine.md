@@ -1,7 +1,7 @@
 # Order State Machine
 
 **Status:** frozen by Phase 0. This is the authoritative order status enum and transition set for
-every service, test, and UI string. Draft source: `docs/planning/backend-design.md`'s Suggested Order
+every service, test, and UI string. Draft source: `docs/planning/sprint-1/backend-design.md`'s Suggested Order
 States section (which this formalizes rather than redesigns).
 
 Order status is owned exclusively by **Order Service** (`orders.status`). No other service writes it.
@@ -30,9 +30,9 @@ order status. See `docs/db-ownership.md`.
 The planning docs are internally inconsistent here, and Phase 0 froze the name rather than leaving
 both in circulation:
 
-- `docs/planning/backend-design.md`'s Suggested Order States list says `OUT_OF_STOCK`.
-- `docs/planning/backend-design.md`'s failed-inventory flow diagram says `REJECTED_OUT_OF_STOCK`.
-- `docs/planning/frontend-design.md`'s Scenario 2 gives `REJECTED_OUT_OF_STOCK` as the expected
+- `docs/planning/sprint-1/backend-design.md`'s Suggested Order States list says `OUT_OF_STOCK`.
+- `docs/planning/sprint-1/backend-design.md`'s failed-inventory flow diagram says `REJECTED_OUT_OF_STOCK`.
+- `docs/planning/sprint-1/frontend-design.md`'s Scenario 2 gives `REJECTED_OUT_OF_STOCK` as the expected
   terminal state.
 
 **`REJECTED_OUT_OF_STOCK` is the frozen value.** It matches two of the three references, including
@@ -95,7 +95,7 @@ would otherwise expect to find an event for.
 Any transition not listed above is invalid and must be rejected by the domain model, not silently
 applied. In particular: no transition leaves a terminal state, and a redelivered event whose
 transition has already been applied is a no-op (the idempotency check in
-`docs/planning/backend-design.md`'s Idempotent consumers section runs before the transition, so
+`docs/planning/sprint-1/backend-design.md`'s Idempotent consumers section runs before the transition, so
 Scenario 4's duplicate produces no second history row).
 
 Every transition writes one `order_status_history` row, carrying `source_event_id` — the envelope
@@ -115,7 +115,7 @@ therefore drives two consecutive transitions in the same Order Service handler �
 payment outcome, `FULFILLMENT_PENDING` records that a shipment is outstanding. `PAID` is consequently
 short-lived and will rarely be observed by the UI. A `FulfillmentRequested` event would make this
 edge event-driven, and was rejected for contradicting
-`docs/planning/backend-design.md` 4.4 — see `docs/events/event-catalog.md` §4.
+`docs/planning/sprint-1/backend-design.md` 4.4 — see `docs/events/event-catalog.md` §4.
 
 **Transition 9 (→ `FAILED`).** `FAILED` appears in the frozen state list with no transitions defined
 into it at all. It is formalized here as the fault outcome — reachable from any non-terminal state

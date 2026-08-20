@@ -10,9 +10,9 @@ and a shipment all reference the same order. A single shared schema with foreign
 would be the natural relational design, and it would make several queries trivial that are otherwise
 awkward — "show me the order with its reservation, payment, and shipment" becomes one join.
 
-It would also make the service boundaries fictional. `docs/planning/backend-design.md`'s PostgreSQL
+It would also make the service boundaries fictional. `docs/planning/sprint-1/backend-design.md`'s PostgreSQL
 Data Model section requires that "each service should ideally own its database/schema boundaries", and
-`docs/planning/implementation-phases.md`'s Phase 3 exit criteria require services to be independently
+`docs/planning/sprint-1/implementation-phases.md`'s Phase 3 exit criteria require services to be independently
 stoppable and restartable with understandable boundaries. A shared schema defeats both: two services
 writing the same table cannot be reasoned about, deployed, or restarted independently, and a migration
 belongs to whoever runs it last.
@@ -34,7 +34,7 @@ travels as events (`docs/events/event-catalog.md`), never as shared SQL. The ful
   one — `order_service` — where `orders` actually lives. Elsewhere it is a correlation identifier the
   database cannot enforce.
 - **Reliability tables are per-service, not shared.** Each service gets its own `processed_events`;
-  `outbox_events` exists only in Order Service (ADR-006). `docs/planning/backend-design.md` groups
+  `outbox_events` exists only in Order Service (ADR-006). `docs/planning/sprint-1/backend-design.md` groups
   these under a "shared reliability tables" heading, which describes the shared *pattern* — its own
   next sentence requires per-service tables, and `docs/db-ownership.md` §2 resolves it explicitly.
 
@@ -52,7 +52,7 @@ architecture does not actually hold.
 and closest to how this would be deployed for real. Rejected for local development as
 disproportionate: four database containers to start, four connection configurations, four sets of
 credentials, and four times the memory, all to enforce a boundary that one schema per service plus a
-code review already enforces. `docs/planning/backend-design.md` explicitly permits sharing one server
+code review already enforces. `docs/planning/sprint-1/backend-design.md` explicitly permits sharing one server
 locally. Nothing in this decision prevents splitting later — the schema-per-service layout is exactly
 what makes that a configuration change.
 

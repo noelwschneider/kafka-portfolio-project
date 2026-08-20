@@ -1,6 +1,6 @@
 # Database Ownership
 
-**Status:** frozen by Phase 0. Draft source: `docs/planning/backend-design.md`'s PostgreSQL Data
+**Status:** frozen by Phase 0. Draft source: `docs/planning/sprint-1/backend-design.md`'s PostgreSQL Data
 Model section.
 
 Rule: **every table has exactly one owning service.** Only that service's code issues DDL or writes
@@ -50,7 +50,7 @@ schema — see §2.
 
 ## 2. `processed_events` and `outbox_events` are per-service, not shared
 
-`docs/planning/backend-design.md` groups these under a heading called "Shared reliability tables
+`docs/planning/sprint-1/backend-design.md` groups these under a heading called "Shared reliability tables
 where needed", which reads as if one table serves all services. Its own next sentence resolves it:
 they "should normally belong to each service that uses them rather than becoming one shared
 cross-service database table."
@@ -74,7 +74,7 @@ The composite key is what makes the same event processable by several *different
 being processed at most once by each. Within a single service, two distinct consumers therefore
 coexist in one table without colliding.
 
-`outbox_events` exists only in Order Service, per `docs/planning/implementation-phases.md`'s Phase 6
+`outbox_events` exists only in Order Service, per `docs/planning/sprint-1/implementation-phases.md`'s Phase 6
 ("at least the most important publisher, likely Order Service"). Other services keep publishing
 after commit; the resulting dual-write window is documented in
 `docs/adr/ADR-006-transactional-outbox-for-db-kafka-consistency.md`.
@@ -83,7 +83,7 @@ after commit; the resulting dual-write window is documented in
 
 ## 3. Tables
 
-Column lists come from `docs/planning/backend-design.md`. Types, keys, and constraints are Phase 0
+Column lists come from `docs/planning/sprint-1/backend-design.md`. Types, keys, and constraints are Phase 0
 additions where that section gave a bare column name.
 
 ### Order Service — `order_service`
@@ -184,8 +184,8 @@ broadcast in `docs/CHANGELOG-contracts.md`).
 `available_quantity >= 0` as a database CHECK is deliberate: it is the last line of defence for
 Scenario 7's invariant ("total reserved inventory never exceeds available inventory") if the
 application-level optimistic locking is ever wrong. `version` is the primary mechanism —
-`docs/planning/backend-design.md` requires locking or optimistic concurrency control here, and
-`docs/planning/execution-plan.md` §2 flags this as the single most correctness-sensitive piece of
+`docs/planning/sprint-1/backend-design.md` requires locking or optimistic concurrency control here, and
+`docs/planning/sprint-1/execution-plan.md` §2 flags this as the single most correctness-sensitive piece of
 logic in the project.
 
 `inventory_reservations.order_id` is **not** a foreign key: `orders` belongs to another service. The
@@ -253,12 +253,12 @@ detail          jsonb NULL               -- topic/partition/offset/eventId/... w
 UNIQUE (run_id, sequence)
 ```
 
-**Phase 0 addition.** `docs/planning/backend-design.md`'s data model defines no scenario tables, but
-its own `GET /demo/scenario-runs/{runId}` endpoint and `docs/planning/frontend-design.md`'s Scenario
+**Phase 0 addition.** `docs/planning/sprint-1/backend-design.md`'s data model defines no scenario tables, but
+its own `GET /demo/scenario-runs/{runId}` endpoint and `docs/planning/sprint-1/frontend-design.md`'s Scenario
 Run Detail page require stored runs with timelines. These two tables are the minimum that supports
 them; reported in `docs/agent-reports/phase-0.md`.
 
-`detail` is `jsonb` and nullable on purpose. `docs/planning/frontend-design.md` says "Do not
+`detail` is `jsonb` and nullable on purpose. `docs/planning/sprint-1/frontend-design.md` says "Do not
 fabricate these fields. Display only values actually available from the system" — so partition,
 offset, and retry count are stored when the runtime knows them and absent when it doesn't, rather
 than defaulted to a plausible-looking zero.
@@ -301,7 +301,7 @@ makes the projection idempotent against Kafka's own at-least-once redelivery. Mi
 ### Where prices come from
 
 `orders.total_amount` and `order_items.unit_price` need a price, and `PaymentRequested.amount`
-carries one — but no table in `docs/planning/backend-design.md`'s data model holds a price at all.
+carries one — but no table in `docs/planning/sprint-1/backend-design.md`'s data model holds a price at all.
 `inventory_items` has `display_name` and quantities, no money.
 
 **Frozen: Order Service owns a static seeded SKU → price map** for the four demo SKUs, applied at
@@ -315,7 +315,7 @@ call to another to price an order.
 | `SKU-003` | Developer Mug | 14.50 |
 | `SKU-004` | External SSD | 249.00 |
 
-Seed stock is unchanged from `docs/planning/backend-design.md`'s Seed Data section: SKU-001: 10,
+Seed stock is unchanged from `docs/planning/sprint-1/backend-design.md`'s Seed Data section: SKU-001: 10,
 SKU-002: 5, SKU-003: 100, SKU-004: 2.
 
 This does mean `display_name` lives in Inventory Service while `unit_price` lives in Order Service —
@@ -329,7 +329,7 @@ There is no currency column anywhere; the project uses a single implicit currenc
 
 ### The Event Explorer's backing store has no owner yet — resolved in Phase 5
 
-`docs/planning/frontend-design.md`'s Event Explorer needs to query recent events across all services,
+`docs/planning/sprint-1/frontend-design.md`'s Event Explorer needs to query recent events across all services,
 filtered by type, order, correlation ID, service, topic, and dead-lettered status. It suggests "a
 lightweight event projection/audit store", but names no owner, and nothing in the data model matches:
 `order_status_history` covers only order status changes, and `scenario_run_timeline` covers only

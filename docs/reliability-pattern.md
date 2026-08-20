@@ -2,10 +2,10 @@
 
 **Status:** the operational reference for Phase 4. Written once, sequentially, so that all four
 services implement one pattern rather than four similar ones
-(`docs/planning/execution-plan.md` §4, Phase 4 row).
+(`docs/planning/sprint-1/execution-plan.md` §4, Phase 4 row).
 
 **Where this sits.** `docs/adr/ADR-005-idempotent-consumers-for-duplicate-delivery.md` decides
-*what and why*; `docs/planning/backend-design.md`'s Reliability Patterns section sketches the
+*what and why*; `docs/planning/sprint-1/backend-design.md`'s Reliability Patterns section sketches the
 outline. This file is the *how*: the concrete Spring Kafka wiring, the exception classification for
 **this** codebase, the numbers and the reasoning behind them, and a checklist. It does not
 re-decide anything ADR-005 decided.
@@ -147,7 +147,7 @@ that actually committed.
 
 ## 3. Retryable vs. non-retryable, for this codebase
 
-`docs/planning/backend-design.md` §8.2's examples are generic. These are the actual classes, as
+`docs/planning/sprint-1/backend-design.md` §8.2's examples are generic. These are the actual classes, as
 configured in `ConsumerErrorHandlerFactory`.
 
 ### 3.1 Non-retryable — dead-lettered on the first delivery
@@ -370,7 +370,7 @@ Service is the worked example to copy from.
 6. **Error handler.** One `@Configuration` with one `DefaultErrorHandler` bean from
    `ConsumerErrorHandlerFactory.create(KafkaTopics.<YOUR>_DLQ)`. Do not re-tune the backoff or the
    classifier locally — if you believe your service needs different numbers, change them here for
-   everyone and say why, per `docs/planning/execution-plan.md` §5.
+   everyone and say why, per `docs/planning/sprint-1/execution-plan.md` §5.
 7. **Backstops.** Confirm your service's own defence-in-depth constraint from ADR-005 is really in
    the schema: `payment_attempts.idempotency_key UNIQUE`, `shipments.order_id UNIQUE`,
    `inventory_reservations UNIQUE (order_id, sku)`.
@@ -386,4 +386,4 @@ Service is the worked example to copy from.
      original bytes and full metadata, and that `x-delivery-attempts` is the honest number.
 10. **Do not** re-implement the ledger, the error handler, the backoff or the pause mechanism
     locally. If `services/common/` does not fit your service, that is a finding to report, not a
-    thing to work around (`docs/planning/execution-plan.md` §5 rule 4).
+    thing to work around (`docs/planning/sprint-1/execution-plan.md` §5 rule 4).

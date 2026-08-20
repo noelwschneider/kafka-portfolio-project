@@ -12,12 +12,12 @@ decision settles is *when*, and it is a sequencing question with a real trap on 
 The trap: writing manifests early means every subsequent boundary change touches them. Phases 1–3
 deliberately restructure the system twice — a modular monolith becomes Kafka-connected modules, which
 then become four independently deployable services
-(`docs/planning/execution-plan.md` §1.1). Deployments, Services, ConfigMaps, and probes written against
+(`docs/planning/sprint-1/execution-plan.md` §1.1). Deployments, Services, ConfigMaps, and probes written against
 the monolith would be rewritten twice before describing anything real, and debugging domain logic
 through a pod restart loop is far slower than debugging it in an IDE.
 
-Both source docs say so directly: `docs/planning/implementation-phases.md`'s Phase 0 ends with "Do not
-begin with Kubernetes", `docs/planning/high-level-design.md`'s Kubernetes Design section opens with "run
+Both source docs say so directly: `docs/planning/sprint-1/implementation-phases.md`'s Phase 0 ends with "Do not
+begin with Kubernetes", `docs/planning/sprint-1/high-level-design.md`'s Kubernetes Design section opens with "run
 application components in Kubernetes only after they work locally", and
 `docs/planning/agent-guidance.md` rule 19 forbids making Kubernetes a prerequisite for early local
 development.
@@ -32,7 +32,7 @@ Kubernetes lands in Phase 8, after service boundaries are stable (Phase 3), reli
 - **Phase 7:** a Dockerfile per service plus a Compose stack that runs the whole system, so a fresh
   clone works from documented commands.
 - **Phase 8:** Deployments, Services, ConfigMaps, Secrets, readiness/liveness probes, and resource
-  requests/limits — targeting local `kind` (`docs/planning/execution-plan.md` §7, chosen over Minikube
+  requests/limits — targeting local `kind` (`docs/planning/sprint-1/execution-plan.md` §7, chosen over Minikube
   for reproducibility in GitHub Actions).
 - **Deferred past Phase 8:** HorizontalPodAutoscaler (Phase 10, with the scaling demonstration),
   PodDisruptionBudget, NetworkPolicy, and service mesh — the last being an explicit non-goal.
@@ -40,7 +40,7 @@ Kubernetes lands in Phase 8, after service boundaries are stable (Phase 3), reli
   project.
 
 Readiness and liveness are treated as genuinely different questions when they are written, per
-`docs/planning/high-level-design.md`'s Health and Kubernetes Probes section: a broker that is
+`docs/planning/sprint-1/high-level-design.md`'s Health and Kubernetes Probes section: a broker that is
 temporarily unreachable should fail readiness, not liveness, because restarting a healthy pod does not
 fix a dependency — and being able to explain that distinction is part of what the project is for.
 
@@ -62,7 +62,7 @@ and HPA behavior under Scenario 8's load.
 **Managed cloud cluster (EKS/GKE) instead of local `kind`.** More impressive on paper, and it would
 force real ingress and image-registry work. Rejected for v1 on cost and reproducibility: a `kind`
 cluster is free, starts in a minute, can be recreated identically inside CI, and demonstrates the same
-Kubernetes objects. `docs/planning/high-level-design.md` leaves a modest cloud cluster open as a later
+Kubernetes objects. `docs/planning/sprint-1/high-level-design.md` leaves a modest cloud cluster open as a later
 option, and nothing here forecloses it.
 
 **Helm charts instead of plain manifests.** Templating would remove per-service duplication. Rejected
@@ -88,7 +88,7 @@ identical Deployments are not yet a duplication problem worth a templating layer
 **What it buys.**
 
 - Phases 1–6 iterate at IDE speed, with a debugger attached, which is where the project's actual
-  correctness risk lives (`docs/planning/execution-plan.md` §2 puts inventory concurrency at its highest
+  correctness risk lives (`docs/planning/sprint-1/execution-plan.md` §2 puts inventory concurrency at its highest
   scrutiny tier).
 - Manifests are written once, against final boundaries.
 - Kubernetes gets introduced for reasons that can be defended in an interview — replicas, restart

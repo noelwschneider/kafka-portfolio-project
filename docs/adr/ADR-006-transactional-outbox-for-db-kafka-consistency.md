@@ -12,7 +12,7 @@ Every publisher in this project does two writes that must either both happen or 
 1. change its own database (insert the order, mark the reservation),
 2. publish the event that tells the rest of the system about it.
 
-They are two different systems, so there is no shared transaction. `docs/planning/backend-design.md`'s
+They are two different systems, so there is no shared transaction. `docs/planning/sprint-1/backend-design.md`'s
 Transactional event publishing section poses the question directly: what happens if the service commits
 its database transaction but fails before publishing?
 
@@ -46,7 +46,7 @@ outbox_events
 id, aggregate_id, event_type, payload (full envelope), created_at, published_at, status
 ```
 
-Scope is deliberately one service. `docs/planning/implementation-phases.md`'s Phase 6 says "at least the
+Scope is deliberately one service. `docs/planning/sprint-1/implementation-phases.md`'s Phase 6 says "at least the
 most important publisher, likely Order Service", and Order Service is the right choice: it is the only
 publisher whose lost event strands an order that a user has already been told was accepted.
 

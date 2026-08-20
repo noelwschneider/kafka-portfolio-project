@@ -6,11 +6,11 @@ here must follow the coordination protocol in `docs/planning/agent-guidance.md`'
 Rules section (propose the change in this file first, state why, then update implementations and
 tests) — not work around it locally.
 
-Draft source: `docs/planning/backend-design.md`'s Event Design, Kafka Topic Strategy, and
+Draft source: `docs/planning/sprint-1/backend-design.md`'s Event Design, Kafka Topic Strategy, and
 Event-Driven Order Lifecycle sections.
 
 JSON Schema files for each payload (`docs/events/schemas/*.json`) are deliberately **not** part of
-Phase 0 — `docs/planning/execution-plan.md` §7 places them at Phase 2, once payloads have been
+Phase 0 — `docs/planning/sprint-1/execution-plan.md` §7 places them at Phase 2, once payloads have been
 exercised by real producers and consumers.
 
 ---
@@ -59,7 +59,7 @@ understand the envelope's aggregate convention to find the order.
 
 ## 2. Topics and keys
 
-Topics are domain-oriented, per `docs/planning/backend-design.md`'s Kafka Topic Strategy section.
+Topics are domain-oriented, per `docs/planning/sprint-1/backend-design.md`'s Kafka Topic Strategy section.
 
 **Frozen rule: a service publishes only to its own domain topic.** Consumers subscribe to whichever
 topics carry the events they need. This is why `PaymentRequested` — a payment-domain event, but
@@ -84,7 +84,7 @@ implementation must not assume any.
 ### Delivery semantics
 
 At-least-once. Consumers must tolerate duplicate delivery and are made idempotent via the
-`processed_events` check described in `docs/planning/backend-design.md`'s Idempotent consumers
+`processed_events` check described in `docs/planning/sprint-1/backend-design.md`'s Idempotent consumers
 section. This project does **not** implement exactly-once semantics, and no document, UI string, or
 README may claim it.
 
@@ -229,7 +229,7 @@ losing order in Scenario 7. It is never retried and never dead-lettered.
 | `releasedAt` | string (RFC 3339) | yes |
 
 **Judgment call (Phase 0):** this event is not named anywhere in the planning docs. It exists
-because `docs/planning/frontend-design.md`'s Scenario 3 advertises "compensation, inventory release"
+because `docs/planning/sprint-1/frontend-design.md`'s Scenario 3 advertises "compensation, inventory release"
 as something the scenario *demonstrates* — and a release that publishes nothing is invisible in the
 run timeline, which would make the demo unable to show its own headline behavior. It has no
 subscriber in v1 by design; adding one later does not change the event.
@@ -268,7 +268,7 @@ whole project uses one implicit currency.
 `payment_attempts.idempotency_key`, so a redelivery of the same event maps to the same attempt row
 rather than authorizing twice.
 
-**Judgment call (Phase 0):** `docs/planning/backend-design.md`'s lifecycle diagram attributes this
+**Judgment call (Phase 0):** `docs/planning/sprint-1/backend-design.md`'s lifecycle diagram attributes this
 event to "Order Service / Payment workflow", which is ambiguous. Frozen as **Order Service**, since
 that is what makes `PAYMENT_PENDING` a reachable order state and keeps payment authorization from
 depending on Payment Service watching inventory events.
@@ -339,7 +339,7 @@ Inventory Service's subscription to this event is the compensation trigger: it r
 reservation and publishes `InventoryReleased`.
 
 `PaymentRejected` means *the payment was declined*. A **retryable** simulated provider error
-(`docs/planning/backend-design.md` 4.3) is a different thing: it raises inside the Payment Service
+(`docs/planning/sprint-1/backend-design.md` 4.3) is a different thing: it raises inside the Payment Service
 consumer, is retried with backoff, and lands in `payments.dlq` if attempts are exhausted. It never
 surfaces as `PaymentRejected`, and it leaves the order in `PAYMENT_PENDING`.
 
@@ -379,9 +379,9 @@ surfaces as `PaymentRejected`, and it leaves the order in `PAYMENT_PENDING`.
 
 | Candidate | Source | Why excluded |
 |---|---|---|
-| `OrderShipped` | `docs/planning/backend-design.md` 4.4, listed as an "optional later event" | In v1 a shipment is created and the order is immediately `FULFILLED`; there is no separate physical dispatch step to report, so the event would carry no information `ShipmentCreated` doesn't. Revisit if a shipment ever acquires a lifecycle of its own. |
-| `FulfillmentRequested` | Not in the planning docs; considered while formalizing the state machine | It would make `PAID` → `FULFILLMENT_PENDING` event-driven and mirror `PaymentRequested` nicely, but `docs/planning/backend-design.md` 4.4 explicitly specifies that Fulfillment Service **consumes `PaymentAuthorized`**. Adding it would contradict a frozen design doc for a cosmetic gain. |
-| Notification events | `docs/planning/backend-design.md` 4.5 (optional Notification Service) | That service is explicitly "only add this after the core system is stable". No service publishes or consumes notification events in v1. |
+| `OrderShipped` | `docs/planning/sprint-1/backend-design.md` 4.4, listed as an "optional later event" | In v1 a shipment is created and the order is immediately `FULFILLED`; there is no separate physical dispatch step to report, so the event would carry no information `ShipmentCreated` doesn't. Revisit if a shipment ever acquires a lifecycle of its own. |
+| `FulfillmentRequested` | Not in the planning docs; considered while formalizing the state machine | It would make `PAID` → `FULFILLMENT_PENDING` event-driven and mirror `PaymentRequested` nicely, but `docs/planning/sprint-1/backend-design.md` 4.4 explicitly specifies that Fulfillment Service **consumes `PaymentAuthorized`**. Adding it would contradict a frozen design doc for a cosmetic gain. |
+| Notification events | `docs/planning/sprint-1/backend-design.md` 4.5 (optional Notification Service) | That service is explicitly "only add this after the core system is stable". No service publishes or consumes notification events in v1. |
 
 ---
 

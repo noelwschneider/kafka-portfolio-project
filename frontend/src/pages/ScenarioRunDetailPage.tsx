@@ -16,7 +16,7 @@ interface Props {
 
 const TERMINAL_RUN_STATUSES = new Set(['COMPLETED', 'FAILED']);
 
-// docs/planning/frontend-design.md §12.4's frozen rule for this page: "Do not fabricate these
+// docs/planning/sprint-1/frontend-design.md §12.4's frozen rule for this page: "Do not fabricate these
 // fields. Display only values actually available from the system." detail is an open, all-optional
 // object (docs/openapi/scenario-service.yaml), so this list is *candidate* keys to look for and
 // label nicely — anything present that isn't in this list still renders via the fallback loop, and

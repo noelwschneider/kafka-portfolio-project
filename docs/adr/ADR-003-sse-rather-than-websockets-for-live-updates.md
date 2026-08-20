@@ -7,7 +7,7 @@
 
 Because the order workflow is asynchronous (ADR-001), `POST /api/orders` returns `PENDING` and every
 interesting thing happens afterwards. A frontend that only polled would either lag behind the
-workflow or hammer the API, and `docs/planning/frontend-design.md`'s Scenario Run Detail page is
+workflow or hammer the API, and `docs/planning/sprint-1/frontend-design.md`'s Scenario Run Detail page is
 explicitly a live timeline: entries should appear as the run progresses, with sub-second timestamps
 visible.
 
@@ -15,7 +15,7 @@ What the client needs is narrow: order status transitions, scenario progress, ti
 occasional health changes. All server-to-client. The client's own actions — create an order, run a
 scenario — are ordinary REST calls that already have a natural request/response shape.
 
-`docs/planning/frontend-design.md`'s Live Frontend Updates section states the preference for SSE and
+`docs/planning/sprint-1/frontend-design.md`'s Live Frontend Updates section states the preference for SSE and
 adds a constraint worth honoring: WebSockets are acceptable if chosen deliberately, "but should not be
 added simply for resume keyword value."
 

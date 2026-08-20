@@ -6,7 +6,7 @@
 ## Context
 
 `docs/planning/agent-guidance.md` rule 17 requires "consistent logging with correlation IDs."
-`docs/planning/high-level-design.md`'s Observability section asks every relevant log line to
+`docs/planning/sprint-1/high-level-design.md`'s Observability section asks every relevant log line to
 carry service name, order ID, correlation ID, event ID, and event type where possible.
 
 Correlation-id propagation itself already existed before this phase:
@@ -103,7 +103,7 @@ logs`). Not evaluated further — no Graylog in this stack and no plan to add on
 **What it buys.**
 
 - Zero new dependencies, no Logback XML to maintain per service, consistent with "mostly wiring
-  existing libraries" (this workstream's assigned tier in `docs/planning/execution-plan.md`).
+  existing libraries" (this workstream's assigned tier in `docs/planning/sprint-1/execution-plan.md`).
 - Every log line, from every one of the 5 backend services, is one `grep <correlation-id>` away
   from being found — verified live, not assumed (phase report).
 - The same JSON lines are immediately Prometheus/Grafana/ELK-shippable later without any format

@@ -1,8 +1,8 @@
 # Demo Scenarios
 
-**Status:** frozen by Phase 0. Source: `docs/planning/frontend-design.md`'s Required Demo Scenarios
+**Status:** frozen by Phase 0. Source: `docs/planning/sprint-1/frontend-design.md`'s Required Demo Scenarios
 section (behavior, what each demonstrates, success conditions) and
-`docs/planning/backend-design.md` 4.6 (endpoint names).
+`docs/planning/sprint-1/backend-design.md` 4.6 (endpoint names).
 
 Every scenario is triggered by `POST /demo/scenarios/{scenarioName}` on Scenario Service and returns
 a `runId`; progress is read from `GET /demo/scenario-runs/{runId}` or streamed from
@@ -18,7 +18,7 @@ Two rules govern everything below:
   controls (payment behavior, consumer pause) or republish a record — never take a shortcut through
   the domain.
 
-Seed data referenced below is from `docs/planning/backend-design.md`'s Seed Data section:
+Seed data referenced below is from `docs/planning/sprint-1/backend-design.md`'s Seed Data section:
 SKU-001: 10, SKU-002: 5, SKU-003: 100, SKU-004: 2. Prices are in `docs/db-ownership.md`.
 
 ---
@@ -155,7 +155,7 @@ the orders complete normally.
 and the affected orders reach `FULFILLED`.
 
 **Note.** The pause is a genuine Spring Kafka listener-container pause, not a discarded message or a
-simulated delay — `docs/planning/backend-design.md` 4.6 requires the outage to "genuinely
+simulated delay — `docs/planning/sprint-1/backend-design.md` 4.6 requires the outage to "genuinely
 disable/stop/restart relevant processing".
 
 ---
@@ -204,11 +204,11 @@ contention.
 **Notes.**
 
 - SKU-004's stock of 2 is the frozen fixture, because
-  `docs/planning/backend-design.md`'s Seed Data section states that quantity exists specifically to
+  `docs/planning/sprint-1/backend-design.md`'s Seed Data section states that quantity exists specifically to
   make this scenario "trivial to trigger with two concurrent small orders".
-  `docs/planning/frontend-design.md` illustrates the scenario with stock 5 and two orders of 4, which
+  `docs/planning/sprint-1/frontend-design.md` illustrates the scenario with stock 5 and two orders of 4, which
   maps onto SKU-002 instead; the two are equivalent in kind, and SKU-004 is the default.
-- `docs/planning/execution-plan.md` §2 assigns the reservation/concurrency logic behind this scenario
+- `docs/planning/sprint-1/execution-plan.md` §2 assigns the reservation/concurrency logic behind this scenario
   its highest scrutiny tier, because a subtle bug here silently oversells stock and invalidates the
   project's core reliability claim. The database `CHECK (available_quantity >= 0)` in
   `docs/db-ownership.md` is the backstop, not the mechanism.
@@ -231,7 +231,7 @@ Kubernetes scaling if an HPA is configured.
 
 **Success condition.** Throughput and lag are observable, and orders reach `FULFILLED` without loss.
 
-**Note.** Explicitly a later-stage scenario (`docs/planning/frontend-design.md`), landing with Phase
+**Note.** Explicitly a later-stage scenario (`docs/planning/sprint-1/frontend-design.md`), landing with Phase
 10's scaling demonstration. The burst size is left to Phase 10, where it can be tuned against real
 measurements; the seeded 100 units of SKU-003 bound it at 100 orders of one unit before a reset is
 needed.

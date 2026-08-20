@@ -33,7 +33,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  */
 class InventoryConcurrencyIntegrationTest extends AbstractIntegrationTest {
 
-    /** docs/planning/frontend-design.md Scenario 7 / docs/scenarios.md: SKU-004 is seeded at 2. */
+    /** docs/planning/sprint-1/frontend-design.md Scenario 7 / docs/scenarios.md: SKU-004 is seeded at 2. */
     private static final String SCARCE_SKU = "SKU-004";
     private static final int SCARCE_STOCK = 2;
 

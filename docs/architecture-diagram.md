@@ -8,7 +8,7 @@ Diagrams render natively on GitHub (Mermaid). Sources of truth for the details b
 Everything drawn here is the **Phase 3+ target**: four business services plus a Scenario Service,
 each with its own schema, communicating through Kafka. Phase 1 is the same domain logic as in-process
 modules with no Kafka, and Phase 2 adds Kafka while still deploying as one application
-(`docs/planning/implementation-phases.md`).
+(`docs/planning/sprint-1/implementation-phases.md`).
 
 ---
 
