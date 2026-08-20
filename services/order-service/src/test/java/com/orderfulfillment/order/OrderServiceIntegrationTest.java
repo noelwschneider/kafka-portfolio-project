@@ -112,9 +112,29 @@ class OrderServiceIntegrationTest extends AbstractIntegrationTest {
                 .containsExactly("PENDING", "REJECTED_OUT_OF_STOCK");
     }
 
+    /**
+     * The full happy path, in the order docs/order-state-machine.md §3 defines it.
+     *
+     * <p><b>Corrected by ADR-009.</b> This test used to publish {@code PaymentAuthorized} against an
+     * order still sitting at {@code PENDING} — skipping {@code InventoryReserved} entirely — and then
+     * assert the history {@code PENDING → PAID → FULFILLMENT_PENDING → FULFILLED}. That path does not
+     * exist in the frozen transition table: transition 5 requires {@code PAYMENT_PENDING}. The test
+     * passed only because {@code OrderPersistence} wrote whatever status it was handed without
+     * consulting the order's current state, which is precisely the defect ADR-009 fixes. It now
+     * drives the real sequence and asserts the real, legal history.
+     */
     @Test
     void paymentAuthorizedThenShipmentCreatedReachesFulfilled() {
         OrderAccepted accepted = createOrder("SKU-002", 1);
+
+        publish(KafkaTopics.INVENTORY_EVENTS, EventTypes.INVENTORY_RESERVED, accepted.id(),
+                new InventoryReservedPayload(accepted.id(), "resv-test-1",
+                        List.of(new EventItem("SKU-002", 1)), Instant.now()));
+
+        await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> {
+            OrderDetail detail = getOrder(accepted.id());
+            assertThat(detail.status()).isEqualTo("PAYMENT_PENDING");
+        });
 
         publish(KafkaTopics.PAYMENTS_EVENTS, EventTypes.PAYMENT_AUTHORIZED, accepted.id(),
                 new PaymentAuthorizedPayload(accepted.id(), "pay-test-1", new BigDecimal("189.00"), Instant.now()));
@@ -134,12 +154,24 @@ class OrderServiceIntegrationTest extends AbstractIntegrationTest {
 
         OrderDetail detail = getOrder(accepted.id());
         assertThat(detail.statusHistory()).extracting("status")
-                .containsExactly("PENDING", "PAID", "FULFILLMENT_PENDING", "FULFILLED");
+                .containsExactly("PENDING", "INVENTORY_RESERVED", "PAYMENT_PENDING", "PAID",
+                        "FULFILLMENT_PENDING", "FULFILLED");
     }
 
+    /** Same ADR-009 correction as the test above: {@code PaymentRejected}'s only valid predecessor is
+     * {@code PAYMENT_PENDING} (transition 6), so the order has to actually get there first. */
     @Test
     void paymentRejectedIsTerminal() {
         OrderAccepted accepted = createOrder("SKU-002", 1);
+
+        publish(KafkaTopics.INVENTORY_EVENTS, EventTypes.INVENTORY_RESERVED, accepted.id(),
+                new InventoryReservedPayload(accepted.id(), "resv-test-2",
+                        List.of(new EventItem("SKU-002", 1)), Instant.now()));
+
+        await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> {
+            OrderDetail detail = getOrder(accepted.id());
+            assertThat(detail.status()).isEqualTo("PAYMENT_PENDING");
+        });
 
         publish(KafkaTopics.PAYMENTS_EVENTS, EventTypes.PAYMENT_REJECTED, accepted.id(),
                 new PaymentRejectedPayload(accepted.id(), "pay-test-2", new BigDecimal("189.00"),

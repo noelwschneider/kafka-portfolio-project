@@ -37,8 +37,12 @@ class ScenarioConflictIntegrationTest extends AbstractIntegrationTest {
         client.post().uri("/demo/scenarios/not-a-real-scenario").exchange().expectStatus().isEqualTo(404);
     }
 
-    @Test
-    void highVolumeIsNotYetAvailable() {
-        client.post().uri("/demo/scenarios/high-volume").exchange().expectStatus().isEqualTo(409);
-    }
+    // A "requesting an unavailable-but-cataloged scenario returns 409" test used to live here,
+    // covering "high-volume" back when ScenarioCatalog registered it with available: false (Phase
+    // 5-9). Phase 10 (Scaling Demo) implemented the scenario for real and flipped it to available:
+    // true (see HighVolumeScenario), so every cataloged scenario is available again and this
+    // ConflictIntegrationTest's specific 409-for-unavailable path has no scenario left to exercise
+    // it against. ScenarioExecutionService.start's ConflictException branch for spec.available() ==
+    // false is still real code, just untested at the integration level until a future scenario is
+    // added ahead of its own implementation.
 }

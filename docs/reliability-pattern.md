@@ -336,6 +336,13 @@ Say these out loud rather than letting them be assumed away:
   is a rule.
 - **The ledger grows monotonically.** A retention policy is needed eventually; it is not urgent at
   demo volume.
+- **Ordering between topics is not covered, and retry is not the tool for it.** Idempotency makes a
+  duplicate harmless; it says nothing about two *different* events for the same aggregate arriving in
+  the wrong order off two different topics. That is a real failure mode in this system — see
+  `docs/adr/ADR-009-out-of-order-status-transitions.md`, which handles it in Order Service with a
+  state-machine guard and a hold, deliberately *not* with §4.3's retry budget: 3.5 s is far shorter
+  than the observed race, and blocking a partition is the wrong price to pay for something that is
+  not a failure.
 - **This is not exactly-once**, and no document, UI string or README may say it is.
 
 ---

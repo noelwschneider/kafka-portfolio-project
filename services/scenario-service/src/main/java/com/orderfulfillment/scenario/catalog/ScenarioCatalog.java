@@ -64,10 +64,11 @@ public class ScenarioCatalog {
                 null, true));
         register(new ScenarioDefinitionSpec(
                 "high-volume", "High-Volume Batch",
-                "Generates many orders quickly and observes throughput/lag. Lands in Phase 10.",
+                "Bursts many real orders for SKU-003 and observes throughput and consumer lag as "
+                        + "the backlog drains.",
                 List.of("event throughput", "consumer groups", "horizontal scaling",
                         "lag/processing behavior"),
-                null, false));
+                null, true));
     }
 
     private void register(ScenarioDefinitionSpec spec) {

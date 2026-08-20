@@ -30,6 +30,7 @@ queries, separate migration timelines) without running four database containers 
 | `order_items` | Order Service | Order lines |
 | `order_status_history` | Order Service | One row per state transition, for the order timeline |
 | `outbox_events` | Order Service | Transactional outbox (Phase 6) |
+| `deferred_transitions` | Order Service | Status transitions consumed before their predecessor arrived, awaiting application (ADR-009) |
 | `processed_events` (`order_service` schema) | Order Service | Idempotency ledger for its own consumers |
 | `inventory_items` | Inventory Service | Per-SKU stock |
 | `inventory_reservations` | Inventory Service | Per-order reservations |
@@ -42,7 +43,7 @@ queries, separate migration timelines) without running four database containers 
 | `scenario_run_timeline` | Scenario Service | Timeline entries for a run |
 | `events` | Scenario Service | Cross-service event projection backing the Event Explorer (Phase 5 addition — see §4's "Event Explorer's backing store has no owner yet") |
 
-15 rows, 5 owners, no table owned twice. `processed_events` is deliberately listed once per owning
+16 rows, 5 owners, no table owned twice. `processed_events` is deliberately listed once per owning
 schema — see §2.
 
 ---
@@ -125,7 +126,26 @@ created_at      timestamptz NOT NULL
 published_at    timestamptz NULL
 status          text NOT NULL        -- PENDING | PUBLISHED | FAILED
 INDEX (status, created_at)
+
+deferred_transitions                 -- ADR-009
+--------------------
+id              bigserial PK
+order_id        text NOT NULL REFERENCES orders(id)
+target_status   text NOT NULL        -- docs/order-state-machine.md §1
+source_event_id uuid NULL            -- envelope eventId; NULL for internal transitions
+status          text NOT NULL        -- PENDING | APPLIED | ABANDONED
+deferred_at     timestamptz NOT NULL
+resolved_at     timestamptz NULL
+INDEX (order_id, status)
 ```
+
+`deferred_transitions` holds transitions Order Service consumed **before their predecessor
+transition had been applied** — the cross-topic ordering race of
+`docs/adr/ADR-009-out-of-order-status-transitions.md`. A `PENDING` row means the event is durably
+accounted for (its `processed_events` claim committed with this row) but not yet reflected in
+`orders.status`; Order Service re-offers these rows after every status change and applies each one
+the transition table permits. It is an Order Service internal, not a cross-service contract: no other
+service reads or writes it.
 
 `UNIQUE (order_id, sku)` means one line per SKU per order; a request naming the same SKU twice is a
 validation error, not two lines.

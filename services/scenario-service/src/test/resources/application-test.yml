@@ -10,3 +10,8 @@ orderfulfillment:
     consumer-outage-pause-ms: 1500
     order-poll-interval-ms: 100
     order-poll-timeout-ms: 15000
+    high-volume-burst-size: 5
+    high-volume-submission-concurrency: 5
+    high-volume-lag-poll-interval-ms: 100
+    high-volume-lag-poll-timeout-ms: 3000
+    high-volume-order-watch-timeout-ms: 15000

@@ -17,13 +17,42 @@ package com.orderfulfillment.order;
  * {@code PaymentRequested} payload after the transaction committed; that event is now recorded in
  * the outbox inside the transaction itself (ADR-006), so nothing needs to escape it any more.
  */
-record StatusTransitionResult(boolean duplicate) {
+record StatusTransitionResult(Outcome outcome) {
+
+    /**
+     * ADR-009 added {@link #DEFERRED} and {@link #STALE} alongside the original applied/duplicate
+     * pair, because "the transition was consumed but not written" now has two honest reasons that
+     * are not duplicates: its predecessor has not arrived yet, or the order has already moved past
+     * it. Reporting either as {@code applied} would be a lie about what the database holds.
+     */
+    enum Outcome {
+        /** The transition was written: one {@code order_status_history} row, {@code orders.status} moved. */
+        APPLIED,
+        /** Some earlier or concurrent delivery of the same event already won the ledger claim. */
+        DUPLICATE,
+        /** Parked in {@code deferred_transitions} until its predecessor transition is applied. */
+        DEFERRED,
+        /** Dropped: the order has already passed this point, or has reached a terminal state. */
+        STALE
+    }
+
+    boolean duplicate() {
+        return outcome == Outcome.DUPLICATE;
+    }
 
     static StatusTransitionResult asDuplicate() {
-        return new StatusTransitionResult(true);
+        return new StatusTransitionResult(Outcome.DUPLICATE);
     }
 
     static StatusTransitionResult asApplied() {
-        return new StatusTransitionResult(false);
+        return new StatusTransitionResult(Outcome.APPLIED);
+    }
+
+    static StatusTransitionResult asDeferred() {
+        return new StatusTransitionResult(Outcome.DEFERRED);
+    }
+
+    static StatusTransitionResult asStale() {
+        return new StatusTransitionResult(Outcome.STALE);
     }
 }

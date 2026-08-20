@@ -11,6 +11,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -31,6 +33,16 @@ import org.springframework.transaction.annotation.Transactional;
  * and the claim covers both writes atomically: either the whole pair commits with the ledger row,
  * or a losing/duplicate delivery gets neither.
  *
+ * <p>Since ADR-009 every write also goes through the frozen transition table
+ * ({@link OrderTransitions}) rather than trusting the status its caller asked for. Order status is
+ * driven by three independently-consumed topics with no ordering guarantee between them, so a
+ * transition can arrive before its predecessor (the {@code payments.events} fan-out lets Fulfillment
+ * Service publish {@code ShipmentCreated} before Order Service has processed the
+ * {@code PaymentAuthorized} that caused it). Such a transition is parked in
+ * {@code deferred_transitions} and re-offered after every subsequent status change; a transition the
+ * order has already passed — including anything that would move it off a terminal state — is
+ * dropped. See docs/adr/ADR-009-out-of-order-status-transitions.md.
+ *
  * <p>Since Phase 6 these transactions also carry the outbound event itself: the two methods that
  * produce one ({@link #createPendingOrder} → OrderCreated, {@link #appendInventoryReservedTransition}
  * → PaymentRequested) insert it into {@code outbox_events} via {@link OutboxRecorder} rather than
@@ -41,19 +53,32 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 class OrderPersistence {
 
+    private static final Logger log = LoggerFactory.getLogger(OrderPersistence.class);
+
+    /**
+     * Safety stop on the drain loop. Applying one parked transition can unblock another, so the loop
+     * repeats; this bounds it well above the longest legal chain (six statuses) so a hypothetical
+     * cycle cannot spin a transaction forever.
+     */
+    private static final int MAX_DRAIN_PASSES = 10;
+
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final OrderStatusHistoryRepository historyRepository;
+    private final DeferredTransitionRepository deferredTransitionRepository;
     private final ProcessedEventLedger processedEventLedger;
     private final ApplicationEventPublisher eventPublisher;
     private final OutboxRecorder outboxRecorder;
 
     OrderPersistence(OrderRepository orderRepository, OrderItemRepository orderItemRepository,
-                      OrderStatusHistoryRepository historyRepository, ProcessedEventLedger processedEventLedger,
+                      OrderStatusHistoryRepository historyRepository,
+                      DeferredTransitionRepository deferredTransitionRepository,
+                      ProcessedEventLedger processedEventLedger,
                       ApplicationEventPublisher eventPublisher, OutboxRecorder outboxRecorder) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.historyRepository = historyRepository;
+        this.deferredTransitionRepository = deferredTransitionRepository;
         this.processedEventLedger = processedEventLedger;
         this.eventPublisher = eventPublisher;
         this.outboxRecorder = outboxRecorder;
@@ -94,8 +119,22 @@ class OrderPersistence {
         if (eventKey != null && !processedEventLedger.recordProcessed(eventKey)) {
             return StatusTransitionResult.asDuplicate();
         }
-        writeStatus(orderId, status, sourceEventId);
-        return StatusTransitionResult.asApplied();
+        OrderEntity order = lockOrder(orderId);
+        return switch (OrderTransitions.classify(order.getStatus(), status)) {
+            case APPLY -> {
+                writeStatus(order, status, sourceEventId);
+                drainDeferred(order);
+                yield StatusTransitionResult.asApplied();
+            }
+            case AHEAD -> {
+                defer(order, status, sourceEventId);
+                yield StatusTransitionResult.asDeferred();
+            }
+            case STALE -> {
+                logStale(order, status, sourceEventId);
+                yield StatusTransitionResult.asStale();
+            }
+        };
     }
 
     /**
@@ -118,12 +157,21 @@ class OrderPersistence {
         if (eventKey != null && !processedEventLedger.recordProcessed(eventKey)) {
             return StatusTransitionResult.asDuplicate();
         }
-        writeStatus(orderId, OrderStatus.INVENTORY_RESERVED, sourceEventId);
-        OrderEntity order = writeStatus(orderId, OrderStatus.PAYMENT_PENDING, null);
+        OrderEntity order = lockOrder(orderId);
+        // INVENTORY_RESERVED's only valid predecessor is PENDING, the lowest status there is, so
+        // this can only be APPLY or STALE — never AHEAD. classify() is still the authority.
+        if (OrderTransitions.classify(order.getStatus(), OrderStatus.INVENTORY_RESERVED)
+                != OrderTransitions.Verdict.APPLY) {
+            logStale(order, OrderStatus.INVENTORY_RESERVED, sourceEventId);
+            return StatusTransitionResult.asStale();
+        }
+        writeStatus(order, OrderStatus.INVENTORY_RESERVED, sourceEventId);
+        writeStatus(order, OrderStatus.PAYMENT_PENDING, null);
 
         UUID paymentRequestedEventId = UUID.randomUUID();
         outboxRecorder.record(EventTypes.PAYMENT_REQUESTED, orderId, paymentRequestedEventId,
                 new PaymentRequestedPayload(orderId, order.getTotalAmount(), paymentRequestedEventId));
+        drainDeferred(order);
         return StatusTransitionResult.asApplied();
     }
 
@@ -140,21 +188,118 @@ class OrderPersistence {
         if (eventKey != null && !processedEventLedger.recordProcessed(eventKey)) {
             return StatusTransitionResult.asDuplicate();
         }
-        writeStatus(orderId, OrderStatus.PAID, sourceEventId);
-        writeStatus(orderId, OrderStatus.FULFILLMENT_PENDING, null);
-        return StatusTransitionResult.asApplied();
+        OrderEntity order = lockOrder(orderId);
+        return switch (OrderTransitions.classify(order.getStatus(), OrderStatus.PAID)) {
+            case APPLY -> {
+                writeStatus(order, OrderStatus.PAID, sourceEventId);
+                writeStatus(order, OrderStatus.FULFILLMENT_PENDING, null);
+                // The whole point of ADR-009's drain: an early ShipmentCreated parked while this
+                // order sat at PAYMENT_PENDING becomes applicable the instant FULFILLMENT_PENDING
+                // exists, and is applied here, in this same transaction.
+                drainDeferred(order);
+                yield StatusTransitionResult.asApplied();
+            }
+            case AHEAD -> {
+                // Not reachable today — PaymentAuthorized answers a PaymentRequested this service
+                // only publishes from the PAYMENT_PENDING transition. Handled anyway, and as a pair,
+                // because transition 7 is not separately event-driven: deferring only PAID would
+                // leave FULFILLMENT_PENDING with nothing to write it.
+                defer(order, OrderStatus.PAID, sourceEventId);
+                defer(order, OrderStatus.FULFILLMENT_PENDING, null);
+                yield StatusTransitionResult.asDeferred();
+            }
+            case STALE -> {
+                // The bug ADR-009 fixes, seen from the other side: this is the late PaymentAuthorized
+                // that used to overwrite an already-FULFILLED order back to FULFILLMENT_PENDING.
+                logStale(order, OrderStatus.PAID, sourceEventId);
+                yield StatusTransitionResult.asStale();
+            }
+        };
     }
 
-    /** Writes one order_status_history row and moves orders.status — docs/order-state-machine.md §3. */
-    private OrderEntity writeStatus(String orderId, OrderStatus status, UUID sourceEventId) {
-        OrderEntity order = orderRepository.findById(orderId).orElseThrow();
+    /**
+     * Reads the order under {@code SELECT ... FOR UPDATE}. Every transition below takes this lock
+     * before it reads the current status, so the guard cannot be evaluated against a status a
+     * concurrent transition is in the middle of changing — see {@link OrderRepository#findByIdForUpdate}.
+     */
+    private OrderEntity lockOrder(String orderId) {
+        return orderRepository.findByIdForUpdate(orderId).orElseThrow();
+    }
+
+    /**
+     * Writes one order_status_history row and moves orders.status — docs/order-state-machine.md §3.
+     * Callers must have already taken the row lock and cleared the transition with
+     * {@link OrderTransitions#classify}; this method itself no longer decides anything.
+     */
+    private void writeStatus(OrderEntity order, OrderStatus status, UUID sourceEventId) {
         OrderStatus previousStatus = order.getStatus();
         Instant now = Instant.now();
         order.setStatus(status);
         order.setUpdatedAt(now);
-        historyRepository.save(new OrderStatusHistoryEntity(orderId, status, sourceEventId, now));
-        publishStatusChanged(orderId, status, previousStatus, sourceEventId, now);
-        return order;
+        historyRepository.save(new OrderStatusHistoryEntity(order.getId(), status, sourceEventId, now));
+        publishStatusChanged(order.getId(), status, previousStatus, sourceEventId, now);
+    }
+
+    /**
+     * Parks a transition whose predecessor has not been applied yet. The row commits in the same
+     * transaction as this event's {@code processed_events} claim, so the event is exactly as durably
+     * accounted for as if it had been applied — nothing is left to Kafka redelivery, which the
+     * ledger would suppress anyway (docs/reliability-pattern.md §2.2), and nothing depends on the
+     * ~3.5 s infrastructural retry budget of §4.3, which is far shorter than the multi-second races
+     * measured in docs/agent-reports/phase-10-scaling-demo.md §4.
+     */
+    private void defer(OrderEntity order, OrderStatus status, UUID sourceEventId) {
+        deferredTransitionRepository.save(
+                new DeferredTransitionEntity(order.getId(), status, sourceEventId, Instant.now()));
+        log.info("Deferring {} for order {} — arrived before its predecessor; order is at {}",
+                status, order.getId(), order.getStatus());
+    }
+
+    /**
+     * Re-offers this order's parked transitions after a status change, applying every one the
+     * transition table now allows. Repeats while progress is being made, because applying one parked
+     * transition can unblock another. Anything still parked once the order is terminal can never
+     * apply and is marked ABANDONED rather than left to look pending forever.
+     */
+    private void drainDeferred(OrderEntity order) {
+        for (int pass = 0; pass < MAX_DRAIN_PASSES; pass++) {
+            boolean appliedAny = false;
+            List<DeferredTransitionEntity> parked = deferredTransitionRepository
+                    .findByOrderIdAndStatusOrderByIdAsc(order.getId(), DeferredTransitionStatus.PENDING);
+            if (parked.isEmpty()) {
+                return;
+            }
+            for (DeferredTransitionEntity deferred : parked) {
+                switch (OrderTransitions.classify(order.getStatus(), deferred.getTargetStatus())) {
+                    case APPLY -> {
+                        log.info("Applying deferred {} for order {} now that it is at {}",
+                                deferred.getTargetStatus(), order.getId(), order.getStatus());
+                        writeStatus(order, deferred.getTargetStatus(), deferred.getSourceEventId());
+                        deferred.resolve(DeferredTransitionStatus.APPLIED, Instant.now());
+                        appliedAny = true;
+                    }
+                    case STALE -> {
+                        log.warn("Abandoning deferred {} for order {}: order is at {}, which it can "
+                                        + "never follow", deferred.getTargetStatus(), order.getId(),
+                                order.getStatus());
+                        deferred.resolve(DeferredTransitionStatus.ABANDONED, Instant.now());
+                    }
+                    case AHEAD -> { /* still waiting on its predecessor — leave it parked */ }
+                }
+            }
+            if (!appliedAny) {
+                return;
+            }
+        }
+        log.error("Deferred-transition drain for order {} did not settle in {} passes; leaving the "
+                + "remaining rows parked", order.getId(), MAX_DRAIN_PASSES);
+    }
+
+    private void logStale(OrderEntity order, OrderStatus status, UUID sourceEventId) {
+        log.warn("Ignoring stale transition to {} for order {} (event {}): order is already at {}. "
+                        + "docs/order-state-machine.md §3 permits no such transition, and applying it "
+                        + "would move the order backwards.",
+                status, order.getId(), sourceEventId, order.getStatus());
     }
 
     /**

@@ -6,6 +6,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record ScenarioProperties(
         long consumerOutagePauseMs,
         long orderPollIntervalMs,
-        long orderPollTimeoutMs
+        long orderPollTimeoutMs,
+        int highVolumeBurstSize,
+        int highVolumeSubmissionConcurrency,
+        long highVolumeLagPollIntervalMs,
+        long highVolumeLagPollTimeoutMs,
+        long highVolumeOrderWatchTimeoutMs
 ) {
 }

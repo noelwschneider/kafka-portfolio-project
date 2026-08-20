@@ -13,6 +13,47 @@ Newest first. Each entry states what changed, why, who is affected, and what the
 
 ---
 
+## 2026-08-20 — new `docs/adr/ADR-009` + `db-ownership.md`: `deferred_transitions` table (Order Service status race fix)
+
+**Changed by:** post-Phase-10 correctness fix for the defect found live in
+`docs/agent-reports/phase-10-scaling-demo.md` §4.
+
+**What changed.**
+
+- New ADR: `docs/adr/ADR-009-out-of-order-status-transitions.md`.
+- `docs/db-ownership.md` §1 and §3: a new table, `deferred_transitions`, owned by Order Service in
+  the `order_service` schema (`V5__deferred_transitions.sql`). No existing table, column, or
+  constraint changed.
+- **`docs/order-state-machine.md` is unchanged and required no change.** Its §3 transition table was
+  already correct; the defect was that Order Service did not enforce it. §3 is now encoded in code
+  (`OrderTransitions`) rather than existing only as prose.
+- **No event payload, topic, consumer group, or API path changed.**
+
+**Why.** Order status is written by three independently-consumed topics with no ordering guarantee
+between them. The deliberate `payments.events` fan-out (`docs/events/event-catalog.md` §3) let
+Fulfillment Service publish `ShipmentCreated` up to 7+ seconds before Order Service processed the
+`PaymentAuthorized` that caused it, so `FULFILLED` was written straight out of `PAYMENT_PENDING` and
+then reverted by the late `PaymentAuthorized` — 34 of 60 orders affected at 2 replicas. Order Service
+now checks every write against the transition table, drops anything that would move an order
+backwards or off a terminal state, and parks a transition that arrives before its predecessor until
+that predecessor is applied. Retry/backoff was rejected as the mechanism: the existing budget
+(~3.5 s, `docs/reliability-pattern.md` §4.3) is shorter than the observed race, and it blocks the
+partition for what is not a failure.
+
+**Who is affected.**
+
+- **Order Service** — implemented; new migration `V5`, new regression test
+  `OrderOutOfOrderTransitionIntegrationTest`. Two existing tests in `OrderServiceIntegrationTest`
+  asserted an invalid state-machine path and were corrected (see the ADR's Consequences).
+- **Everyone else — no action on contracts.** But note the behavior change if you assert on Order
+  Service status: an order whose events arrive out of order now converges to the correct terminal
+  state *slightly later* rather than jumping ahead, and an invalid transition is now dropped at WARN
+  instead of being written. Anything that relied on Order Service accepting a status write from an
+  arbitrary current state (including tests that skip `InventoryReserved`) will need to drive the real
+  sequence.
+
+---
+
 ## 2026-08-18 — `db-ownership.md` + `openapi/scenario-service.yaml`: new `events` table and `GET /demo/events` (Event Explorer)
 
 **Changed by:** Phase 5, Scenario Service build (`docs/agent-reports/phase-5-scenario-service.md`).

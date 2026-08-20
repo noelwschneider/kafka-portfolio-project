@@ -68,16 +68,48 @@ public class OrderStatusWatcher {
         this.httpClient = HttpClient.newBuilder().connectTimeout(SSE_CONNECT_TIMEOUT).build();
     }
 
-    /** Blocks the calling (scenario-executor) thread until the order reaches a terminal status or times out. */
+    /** Blocks the calling (scenario-executor) thread until the order reaches a terminal status or times out,
+     * using the shared default budget ({@code orderfulfillment.scenario.order-poll-timeout-ms}). */
     public String awaitTerminal(String runId, String orderId) {
+        return awaitTerminal(runId, orderId, properties.orderPollTimeoutMs());
+    }
+
+    /** Same as {@link #awaitTerminal(String, String)}, with an explicit timeout budget. Added for
+     * Scenario 8 (High-Volume Batch): dozens of orders watched concurrently against one
+     * resource-constrained Order Service pod can each legitimately need longer than the shared
+     * default before their SSE connection or poll gets a CPU slice, even though the order itself
+     * reaches FULFILLED promptly — a per-call override lets that scenario budget for its own
+     * concurrency instead of inflating the timeout every other scenario uses. */
+    public String awaitTerminal(String runId, String orderId, long timeoutMs) {
         Set<String> seen = new LinkedHashSet<>();
-        long deadline = System.currentTimeMillis() + properties.orderPollTimeoutMs();
+        long deadline = System.currentTimeMillis() + timeoutMs;
 
         String terminal = awaitViaSse(runId, orderId, seen, deadline);
         if (terminal != null) {
             return terminal;
         }
         return awaitViaPolling(runId, orderId, seen, deadline);
+    }
+
+    /**
+     * Same as {@link #awaitTerminal(String, String, long)}, but skips the SSE path entirely and
+     * goes straight to polling. Added for Scenario 8 (High-Volume Batch): a real defect was found
+     * live against the Phase 8 {@code kind} cluster (docs/agent-reports/phase-10-scaling-demo.md) —
+     * dozens of orders watched concurrently each open their own long-lived
+     * {@code GET /api/orders/stream} connection against one resource-constrained Order Service pod,
+     * and under that load Order Service's SSE emitter can error out in a way its own
+     * {@code GlobalExceptionHandler} cannot recover from ({@code HttpMessageNotWritableException}:
+     * no converter for an error body once the response's content-type is already committed to
+     * {@code text/event-stream}), corrupting that connection's status trace. The underlying
+     * workflow is unaffected (confirmed live: every consumer group's lag was 0, i.e. every event was
+     * actually processed) — only this scenario's own high-concurrency SSE fan-out triggers it, so
+     * this scenario avoids it at the source rather than working around the symptom with longer
+     * timeouts. Fixing Order Service's SSE emitter under concurrent load is out of this phase's
+     * scope (application code in a different service) and is flagged, not fixed, here.
+     */
+    public String awaitTerminalPollOnly(String runId, String orderId, long timeoutMs) {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        return awaitViaPolling(runId, orderId, new LinkedHashSet<>(), deadline);
     }
 
     /** @return the terminal status if reached over the stream, or {@code null} if the stream never

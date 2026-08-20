@@ -66,6 +66,17 @@ public class OrderFulfillmentEventsConsumer {
         }
 
         log.info("Processing ShipmentCreated {} for order {}", envelope.eventId(), orderId);
-        persistence.appendStatus(orderId, OrderStatus.FULFILLED, envelope.eventId(), eventKey);
+        StatusTransitionResult result =
+                persistence.appendStatus(orderId, OrderStatus.FULFILLED, envelope.eventId(), eventKey);
+        if (result.outcome() == StatusTransitionResult.Outcome.DEFERRED) {
+            // Expected under load, not a failure: Fulfillment Service consumes PaymentAuthorized off
+            // payments.events in its own consumer group, so it can create the shipment — and this
+            // event — before Order Service's own OrderPaymentEventsConsumer has applied PAID /
+            // FULFILLMENT_PENDING. The transition is parked and applied the moment that happens
+            // (ADR-009); deliberately not retried, which would only block the partition and then
+            // dead-letter a perfectly valid event (docs/reliability-pattern.md §4.3).
+            log.info("ShipmentCreated {} for order {} arrived before PaymentAuthorized was applied; "
+                    + "deferred until FULFILLMENT_PENDING is reached", envelope.eventId(), orderId);
+        }
     }
 }

@@ -43,6 +43,22 @@ orderfulfillment:
     # this service was built — see the report's follow-up note.
     order-poll-interval-ms: 250
     order-poll-timeout-ms: 20000
+    # Phase 10 Scaling Demo (Scenario 8 — High-Volume Batch). Burst size stays under SKU-003's
+    # seeded stock of 100 so a run never needs an artificial restock; tuned against the real
+    # replica-scaling measurements in docs/agent-reports/phase-10-scaling-demo.md.
+    high-volume-burst-size: 60
+    # Client-side POST /api/orders concurrency for the burst — deliberately well above the
+    # broker's 3-partition ceiling (KafkaTopicConfig), since this bounds how fast this service can
+    # *submit* the burst, not how fast Inventory Service's consumer group can *drain* it.
+    high-volume-submission-concurrency: 20
+    high-volume-lag-poll-interval-ms: 300
+    high-volume-lag-poll-timeout-ms: 60000
+    # Longer than order-poll-timeout-ms (used by every other scenario watching a single order):
+    # dozens of orders watched concurrently against one Order Service pod can each legitimately
+    # need longer than 20s before their SSE connection/poll gets a CPU slice under this burst's
+    # load, even though the order itself reaches FULFILLED promptly (see OrderStatusWatcher's
+    # per-call timeout overload).
+    high-volume-order-watch-timeout-ms: 60000
 
 management:
   endpoints:
