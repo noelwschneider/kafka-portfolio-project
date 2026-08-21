@@ -158,6 +158,57 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /demo/inventory/{sku}/restore:
+    parameters:
+      - name: sku
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: '^SKU-[0-9]{3}$'
+        example: SKU-001
+    post:
+      tags: [demo]
+      operationId: restoreInventoryItem
+      summary: Atomically restore a SKU's stock and clear its reservations
+      description: |
+        Demo-only counterpart to `PUT /api/inventory/{sku}`. Sets `availableQuantity` to the given
+        value **and** zeroes `reservedQuantity` in the same write.
+
+        `PUT /api/inventory/{sku}` cannot restore a long-running demo to a clean state: reservations
+        are only released on the payment-failure compensation path, never on successful fulfillment,
+        so `reservedQuantity` accumulates without bound and routinely exceeds any seed value by the
+        time a reset is needed. The production PUT correctly rejects that as an oversold state
+        (`availableQuantity >= reservedQuantity`); this endpoint exists specifically to bypass that
+        guard for demo administration, where clearing the reservation ledger alongside the stock
+        level is the whole point.
+
+        Called only by Scenario Service's `POST /demo/reset`, over cluster-internal DNS — like
+        `/demo/consumers`, this path is deliberately absent from the production ingress allowlist.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestoreInventoryRequest'
+            examples:
+              restoreSeed:
+                value:
+                  availableQuantity: 100
+      responses:
+        '200':
+          description: Restored stock record. `reservedQuantity` is always 0 in the response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /demo/consumers:
     get:
       tags: [demo]
@@ -283,6 +334,17 @@ components:
           type: integer
           minimum: 0
           maximum: 10000
+
+    RestoreInventoryRequest:
+      type: object
+      additionalProperties: false
+      required: [availableQuantity]
+      properties:
+        availableQuantity:
+          type: integer
+          minimum: 0
+          maximum: 10000
+          description: Seed quantity to restore. `reservedQuantity` is always set to 0 alongside it.
 
     ConsumerState:
       type: object

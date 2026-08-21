@@ -17,7 +17,7 @@ class DemoResetIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void resetRestoresSeedInventoryResumesConsumersAndClearsPaymentBehavior() {
-        INVENTORY_SERVICE.stubFor(put(urlPathMatching("/api/inventory/SKU-00[1-4]"))
+        INVENTORY_SERVICE.stubFor(post(urlPathMatching("/demo/inventory/SKU-00[1-4]/restore"))
                 .willReturn(aResponse().withStatus(200)));
         INVENTORY_SERVICE.stubFor(get(urlPathEqualTo("/demo/consumers")).willReturn(aResponse().withStatus(200)
                 .withHeader("Content-Type", "application/json")

@@ -6,7 +6,6 @@ import static com.github.tomakehurst.wiremock.client.WireMock.deleteRequestedFor
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
-import static com.github.tomakehurst.wiremock.client.WireMock.put;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;
 import static org.awaitility.Awaitility.await;
@@ -57,7 +56,7 @@ class IdleResetSchedulerIntegrationTest extends AbstractIntegrationTest {
         boolean claimed = runRegistry.tryStart(scenarioName, "fake-run-id", correlationId);
         assertThat(claimed).isTrue();
 
-        INVENTORY_SERVICE.stubFor(put(urlPathMatching("/api/inventory/SKU-00[1-4]"))
+        INVENTORY_SERVICE.stubFor(post(urlPathMatching("/demo/inventory/SKU-00[1-4]/restore"))
                 .willReturn(aResponse().withStatus(200)));
         INVENTORY_SERVICE.stubFor(get(urlPathEqualTo("/demo/consumers")).willReturn(aResponse().withStatus(200)
                 .withHeader("Content-Type", "application/json")

@@ -79,6 +79,28 @@ public class InventoryService {
     }
 
     /**
+     * {@code POST /demo/inventory/{sku}/restore} — Scenario Service's {@code DemoResetService} uses
+     * this instead of {@link #updateAvailableQuantity} to bring a SKU back to its seed state.
+     *
+     * <p>Deliberately bypasses the {@code availableQuantity >= reservedQuantity} guard that
+     * {@link #updateAvailableQuantity} enforces: reservations are only released on the
+     * payment-failure compensation path (never on successful fulfillment — see
+     * docs/agent-reports/sprint-2/deployment-execution-report.md §6), so {@code reservedQuantity}
+     * accumulates without bound over a long-running demo and will routinely exceed any seed value.
+     * The production PUT correctly rejects that as an oversold state; this demo-only endpoint's whole
+     * job is to atomically zero both fields together so a "reset" actually means what it says instead
+     * of failing with 409 or leaving {@code freeQuantity()} permanently below the seed.
+     */
+    @Transactional
+    public InventoryItemDto restoreForDemo(String sku, int seedAvailableQuantity) {
+        InventoryItemEntity item = findItem(sku);
+        item.setAvailableQuantity(seedAvailableQuantity);
+        item.setReservedQuantity(0);
+        item.setUpdatedAt(Instant.now());
+        return toDto(item);
+    }
+
+    /**
      * All-or-nothing reservation for every line of one order. Retries on a version conflict.
      *
      * <p><b>Why the retry budget is what it is.</b> A version conflict here is never a "maybe it

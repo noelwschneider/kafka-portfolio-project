@@ -55,6 +55,17 @@ public class IdleResetScheduler {
      * first check. */
     private final Instant startedAt = Instant.now();
 
+    /**
+     * When this scheduler last actually ran {@link DemoResetService#reset()}. Without this, {@link
+     * #lastActivityAt()} only ever consults {@code scenario_runs} — which an idle auto-reset does not
+     * write to — so once the idle threshold was crossed once it stayed crossed forever and every
+     * subsequent check fired another full reset (observed live: refired every 60s indefinitely, see
+     * docs/agent-reports/sprint-2/deployment-execution-report.md §6 finding 3). Recording the
+     * scheduler's own run as activity makes the idle clock restart the same way a real scenario run
+     * restarts it.
+     */
+    private volatile Instant lastAutoResetAt;
+
     public IdleResetScheduler(RunRegistry runRegistry, ScenarioRunRepository runRepository,
                                DemoResetService demoResetService, IdleResetProperties properties) {
         this.runRegistry = runRegistry;
@@ -78,19 +89,23 @@ public class IdleResetScheduler {
 
         try {
             demoResetService.reset();
+            lastAutoResetAt = Instant.now();
             log.info("Idle auto-reset triggered after {} of no scenario activity", idleFor);
         } catch (ConflictException e) {
             // Benign race: a run started between the guard check above and reset() itself. No-op,
-            // not an error — the next check picks up fresh idle-time bookkeeping either way.
+            // not an error — the next check picks up fresh idle-time bookkeeping either way. Do not
+            // update lastAutoResetAt here — no reset actually happened, so the idle clock must not
+            // restart.
         }
     }
 
     private Instant lastActivityAt() {
-        return runRepository.findAll(PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "startedAt")))
+        Instant lastRunActivity = runRepository.findAll(PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "startedAt")))
                 .stream()
                 .findFirst()
                 .map(IdleResetScheduler::lastTimestamp)
                 .orElse(startedAt);
+        return lastAutoResetAt != null && lastAutoResetAt.isAfter(lastRunActivity) ? lastAutoResetAt : lastRunActivity;
     }
 
     private static Instant lastTimestamp(ScenarioRunEntity run) {

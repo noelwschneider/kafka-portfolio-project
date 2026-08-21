@@ -80,7 +80,7 @@ public class DemoResetService {
         boolean allOk = true;
         for (Map.Entry<String, Integer> entry : SEED_QUANTITIES.entrySet()) {
             try {
-                inventoryServiceClient.setAvailableQuantity(entry.getKey(), entry.getValue());
+                inventoryServiceClient.restoreInventory(entry.getKey(), entry.getValue());
             } catch (Exception e) {
                 log.warn("Failed to restore seed quantity for {}: {}", entry.getKey(), e.getMessage());
                 allOk = false;

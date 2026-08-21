@@ -13,6 +13,36 @@ Newest first. Each entry states what changed, why, who is affected, and what the
 
 ---
 
+## 2026-08-20 — `openapi/inventory-service.yaml`: new `POST /demo/inventory/{sku}/restore`
+
+**Changed by:** fix for the reset defect found live in
+`docs/agent-reports/sprint-2/deployment-execution-report.md` §6.
+
+**What changed.** A new `/demo` path, `POST /demo/inventory/{sku}/restore`, with a new
+`RestoreInventoryRequest` schema (`{availableQuantity}`). It sets `availableQuantity` to the given
+value **and** zeroes `reservedQuantity` in the same write, bypassing the
+`availableQuantity >= reservedQuantity` guard that `PUT /api/inventory/{sku}` enforces. No existing
+path or schema changed.
+
+**Why.** `reservedQuantity` was structurally unreachable from the existing `PUT` — it only ever sets
+`availableQuantity` and rejects a value below the current reservation count. Reservations are never
+released on the successful-fulfillment path, so on a long-running demo `reservedQuantity` drifts
+upward without bound and free stock (`availableQuantity - reservedQuantity`) trends to zero
+permanently; `POST /demo/reset` could not fix it through the existing contract because there was no
+write path that could ever bring `reservedQuantity` back down. This new endpoint gives Scenario
+Service's reset an atomic way to clear both fields together.
+
+**Who is affected.**
+
+- **Inventory Service** — implemented: `InventoryService#restoreForDemo`, `DemoInventoryController`.
+  Deliberately kept out of the production ingress allowlist, same as `/demo/consumers` — called only
+  by Scenario Service over cluster-internal DNS.
+- **Scenario Service** — `InventoryServiceClient` and `DemoResetService#restoreInventory` now call
+  this endpoint instead of `PUT /api/inventory/{sku}`.
+- **Everyone else — no action.** No event payload, topic, or existing API path changed.
+
+---
+
 ## 2026-08-20 — new `docs/adr/ADR-009` + `db-ownership.md`: `deferred_transitions` table (Order Service status race fix)
 
 **Changed by:** post-Phase-10 correctness fix for the defect found live in
