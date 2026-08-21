@@ -13,7 +13,7 @@ Layout:
 | `common/` | The overlay itself — the base manifests minus the dev Secret, plus the ingress, the `ClusterIP` patch and the CX23 tuning |
 | `common/ingress.yaml` | Traefik `Ingress` + `StripPrefix` middleware. **The path allowlist is the demo's security boundary** — read the header comment before editing |
 | `common/patch-tuning.yaml` | JVM heap caps, `startupProbe`s, relaxed probe timings for a 2-vCPU box |
-| `ghcr/` | The overlay as deployed: `common/` plus real GHCR image references. **Has an `OWNER` placeholder to fill in** |
+| `ghcr/` | The overlay as deployed: `common/` plus real GHCR image references |
 | `local-verify/` | The same overlay against locally-built `kind` images, so the whole thing can be exercised without a registry |
 | `render.sh` | Renders any of the above to stdout, to be piped into `kubectl apply -f -` |
 | `create-postgres-secret.sh` | Generates the Postgres `Secret` at apply time instead of using the committed dev password |
@@ -38,11 +38,11 @@ a flag `kubectl kustomize` accepts and `kubectl apply -k` does not. The alternat
 `kubectl apply -f infrastructure/kubernetes/` applies every YAML file in that directory. Keeping the
 base directory pure Kubernetes objects is the constraint; the script is the price.
 
-Before the first deploy, `ghcr/kustomization.yaml` needs `OWNER` replaced with the GitHub account
-that owns the repository. `.github/workflows/build-images.yml` derives the same path automatically
-from `${{ github.repository }}` and prints the exact image names it pushed. GHCR packages are
-created private; they must be switched to public once, or k3s cannot pull them without an
-`imagePullSecret`.
+`ghcr/kustomization.yaml` points at `ghcr.io/noelwschneider/kafka-portfolio-project/{service}`,
+the same path `.github/workflows/build-images.yml` derives from `${{ github.repository }}` at build
+time. The workflow is `workflow_dispatch` only — run it whenever the images need rebuilding, and it
+prints the exact names it pushed. The six packages are public, so k3s pulls them with no
+`imagePullSecret`; a newly created GHCR package defaults to private and would need switching once.
 
 ## What the overlay changes, and why each one matters
 
