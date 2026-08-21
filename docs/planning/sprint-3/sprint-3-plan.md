@@ -54,11 +54,20 @@ codebase.
 
 ## Definition of done
 
-Both goals delivered, or explicitly re-scoped with a documented reason — same standard as Sprint 2.
-Given the Study Guide's own briefing explicitly expects it may span multiple sessions, "done" for that
-goal means a complete first pass across all sections in `portfolio-plan.md` §31's categories plus the
-20 questions in §32, not necessarily a document the developer considers finished forever — it's a
-personal reference, not a frozen artifact, and can keep growing after this sprint closes if needed.
+Neither goal has a checklist-shaped completion this time — both are judged by the developer's own
+satisfaction, not by a fixed deliverable list, and that's deliberate rather than a planning gap:
+
+- **Workflow Refinement** ends when the developer is satisfied with the resulting workflow. It's an
+  open-ended working conversation by design (see `workflow-agent-briefing.md`) — there is no
+  checklist to complete.
+- **Study Guide** is a personal reference expected to keep growing past this sprint's close, not a
+  frozen artifact with a final page count. "Done" for this sprint means the structure is agreed (a
+  chapter breakdown grounded in the project's real build history, plus a pattern-consolidation
+  approach) and a first rough pass exists across it — not that every chapter is in its final,
+  developer-approved state.
+
+Same re-scoping standard as Sprint 2 applies if either goal needs to change shape mid-sprint — just
+judged against the goals above rather than a fixed checklist.
 
 ## Planning docs this sprint needs
 

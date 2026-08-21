@@ -65,36 +65,42 @@ point of this exercise. Cover at minimum:
   than "resume the same agent by name and tell it to re-orient."
 - Anything else that surfaces as clearly relevant while reading — this list is a floor, not a ceiling.
 
-## What "done" looks like
+## This is not a delegate-and-report task
 
-Not a report alone. For anything low-risk and clearly beneficial, make the actual change:
+There is no fixed completion state you determine on your own, and no final report to hand back
+unprompted. The developer wants to be substantially more involved in this task than in prior
+delegated work on this project — the actual shape is:
 
-- If a reusable subagent preset for this project's recurring "implement an already-diagnosed fix,
-  verify it live" delegation shape is worth building, build it (`.claude/agents/`).
-- If a slash command would meaningfully reduce friction for a recurring ritual (sprint planning, a
-  redeploy, a bug-hunt pass), create it.
-- Update `docs/planning/agent-guidance.md` with whatever the refined practice turns out to be — that's
-  the durable home for orchestration rules on this project, and it already has a section this task's
-  findings should extend or correct, not duplicate.
+1. **You prepare thoroughly** (the required reading, then the capability research above) *before* the
+   developer engages, so their time goes into judgment and decisions, not waiting on you to look
+   things up mid-conversation.
+2. **You brief them.** Once prepared, summarize clearly what's actually available — subagent presets,
+   hooks, memory, slash commands, model/effort tiering, whatever else surfaced — in a way that invites
+   questions rather than assuming they already know the landscape. Expect real back-and-forth here;
+   they will ask clarifying questions about capabilities before moving on.
+3. **Then hold an open-ended working conversation**, comparing what the orchestration retrospective
+   says has actually happened against what you now know is possible, looking for concrete places to
+   tighten instructions, adopt a tool, or change a habit. This is the actual work of the task, and it
+   happens *with* the developer, not for them.
 
-For anything bigger — a change to how the *primary orchestrating session* (the one the developer
-actually talks to day-to-day) is expected to behave, or anything that would meaningfully change the
-developer's own habits — write up the recommendation clearly with a specific rationale, but don't
-implement it unilaterally. Flag it for the developer's sign-off. Use judgment on where that line is;
-state where you drew it if it's not obvious.
+**There is no checklist that marks this done.** The developer described this task themselves as
+"scrum-master kryptonite" — open-ended by nature, finished when they're satisfied with the resulting
+workflow, not when a list of subtasks is checked off. Don't manufacture a false completion signal by
+wrapping up early with a summary; let the conversation actually run its course.
+
+Within that conversation, still aim to make concrete, low-risk changes directly rather than only
+proposing them — a subagent preset, a slash command, an `agent-guidance.md` update — when something
+becomes clearly worth doing. For anything that would meaningfully change how the *primary
+orchestrating session* (the one the developer talks to day-to-day) behaves, that's exactly the kind of
+thing to raise as a discussion point in the conversation itself, not decide unilaterally and report
+afterward.
 
 Don't adopt process for its own sake. This project's own engineering culture (`CLAUDE.md`: "smallest
 coherent system," don't over-engineer, don't design for hypotheticals) applies here too — a technique
 that's impressive but doesn't address a real friction point observed in the retrospective isn't worth
-adopting just because it exists.
-
-## When done
-
-Report: what you changed directly (files, presets, commands — and why each one was low-risk enough to
-just do), what you're recommending but leaving for sign-off (and why), and anything from "what hasn't
-been tried" in the retrospective that you investigated and concluded *isn't* worth adopting — that's
-as useful a finding as something you do recommend, and it saves this from being re-litigated next
-sprint.
+raising just because it exists. If something from "what hasn't been tried" turns out not to be worth
+adopting once you understand it properly, that's a legitimate, useful thing to say plainly in the
+conversation — not something to omit because it wasn't a win.
 
 ## Starter prompt
 
@@ -103,7 +109,7 @@ everything it refers to is covered above):
 
 > This project has an external planning doc at
 > `docs/planning/sprint-3/workflow-agent-briefing.md` — read it first, it has everything you need
-> (why, the required reading, what to research, what "done" looks like). This is about how Claude
-> Code gets used on this project, not about the application code itself. Work through the required
-> reading, then research current Claude Code / Agent SDK / API capabilities, then bring back concrete
-> recommendations — and just make the low-risk changes directly rather than only proposing them.
+> (why, the required reading, what to research). This is about how Claude Code gets used on this
+> project, not about the application code itself. Work through the required reading and the
+> capability research on your own first, then brief me on what you found — I'll have questions. This
+> is meant to be a real conversation, not a task you complete and hand back a report on.
