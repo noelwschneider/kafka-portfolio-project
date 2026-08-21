@@ -1,0 +1,28 @@
+# The production overlay, pointed back at locally-built images so the whole thing can be applied
+# to a local `kind` cluster and actually exercised. This is the harness the W1 acceptance criteria
+# were checked against; it is committed so the check is repeatable rather than a one-off.
+#
+# It changes exactly one thing about ../: which images the six Deployments pull. Routing, the
+# ClusterIP patch, the allowlist and the CX23 tuning are the real thing, unmodified.
+#
+# Usage (full procedure, including installing Traefik into kind, is in ../README.md):
+#   kubectl apply -k infrastructure/kubernetes/production/local-verify
+#
+# `frontend:local-prod` is the frontend image built with the production build args, i.e. the one
+# whose bundle calls /svc/order, /svc/inventory, ... instead of http://localhost:808X:
+#   docker build -t frontend:local-prod \
+#     --build-arg VITE_ORDER_SERVICE_URL=/svc/order \
+#     --build-arg VITE_INVENTORY_SERVICE_URL=/svc/inventory \
+#     --build-arg VITE_PAYMENT_SERVICE_URL=/svc/payment \
+#     --build-arg VITE_FULFILLMENT_SERVICE_URL=/svc/fulfillment \
+#     --build-arg VITE_SCENARIO_SERVICE_URL=/svc/scenario \
+#     frontend/
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../common
+
+images:
+  - name: frontend
+    newTag: local-prod

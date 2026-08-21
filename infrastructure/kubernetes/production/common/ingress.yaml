@@ -1,0 +1,186 @@
+# W1 — the public entry point for the demo box, and the security boundary that replaces the six
+# NodePorts (which this overlay turns into ClusterIP, see kustomization.yaml).
+#
+# Model: one hostname, everything behind it. Backend calls are prefixed `/svc/{service}/...`; a
+# StripPrefix middleware removes `/svc/{service}` before the request reaches the pod, so every
+# service keeps serving the exact paths it serves locally and the Deployments' probe paths are
+# untouched. The frontend production build is built with those same prefixes as its base URLs
+# (frontend/Dockerfile's VITE_*_SERVICE_URL build args, W2), which also makes every browser request
+# same-origin — so CORS is never consulted in production at all.
+#
+# THIS IS AN ALLOWLIST, AND THAT IS THE POINT. Only the paths listed below are routed; anything
+# else has no matching router and Traefik answers 404. The endpoints that can wedge the demo
+# indefinitely with no auto-recovery —
+#
+#   POST /demo/consumers/{name}/pause   (inventory-service, fulfillment-service)
+#   PUT  /demo/payment-behavior         (payment-service)
+#
+# — are never called by the browser. Scenario Service invokes them server-side over cluster
+# -internal DNS, which keeps working because that traffic never touches this Ingress. So they are
+# simply not routed, and the wedge risk is removed structurally rather than by authentication.
+# `/actuator/metrics` and `/actuator/prometheus` (exposed by management.endpoints.web.exposure
+# .include in every service) are excluded for the same reason: nothing in the browser needs them.
+#
+# Consequences worth knowing before editing this file:
+#
+#   * Adding a frontend route (App.tsx's <Routes>) means adding it to the frontend Ingress below.
+#     That is the cost of not having a catch-all: a `/` prefix rule would match everything,
+#     including `/svc/inventory/demo/consumers/...`, and would answer it with the SPA's index.html
+#     instead of a 404. Nothing would leak — that request would still never reach a backend — but
+#     "not listed means 404" is a far easier property to check than "not listed means you get some
+#     HTML", so the frontend is enumerated too.
+#   * The SPA's own `<Route path="*">` catch-all (redirect to `/`) is therefore unreachable for
+#     paths this Ingress does not route: they 404 at the edge instead of loading the app.
+#   * No `host:` is set, so these rules apply to every hostname pointed at the box. That is
+#     deliberate — it means the allowlist cannot be sidestepped by hitting the node's IP directly.
+#     Adding TLS and a hostname is the deployment session's job (`tls:` block plus `host:` on each
+#     rule); it does not change any path below.
+#
+# Traefik version note: k3s ships Traefik, and Traefik v3 serves these CRDs under `traefik.io`.
+# Confirm on the box before applying, since a v2 install would need `traefik.containo.us`:
+#   kubectl get crd middlewares.traefik.io && kubectl -n kube-system get deploy traefik \
+#     -o jsonpath='{.spec.template.spec.containers[0].image}'
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-svc-prefix
+  namespace: orderfulfillment
+spec:
+  stripPrefix:
+    # Traefik strips the first prefix in this list that matches. The five are disjoint, so order
+    # does not matter here.
+    prefixes:
+      - /svc/order
+      - /svc/inventory
+      - /svc/payment
+      - /svc/fulfillment
+      - /svc/scenario
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: backend-svc
+  namespace: orderfulfillment
+  annotations:
+    # Applies to every rule in this Ingress — which is why the frontend lives in a separate
+    # Ingress object below (it must not be stripped).
+    traefik.ingress.kubernetes.io/router.middlewares: orderfulfillment-strip-svc-prefix@kubernetescrd
+spec:
+  rules:
+    - http:
+        paths:
+          # --- order-service -----------------------------------------------------------------
+          # Prefix also covers /api/orders/{id} and the SSE stream /api/orders/stream.
+          - path: /svc/order/api/orders
+            pathType: Prefix
+            backend:
+              service:
+                name: order-service
+                port:
+                  number: 8081
+          - path: /svc/order/actuator/health
+            pathType: Prefix
+            backend:
+              service:
+                name: order-service
+                port:
+                  number: 8081
+          # --- inventory-service -------------------------------------------------------------
+          - path: /svc/inventory/api/inventory
+            pathType: Prefix
+            backend:
+              service:
+                name: inventory-service
+                port:
+                  number: 8082
+          - path: /svc/inventory/actuator/health
+            pathType: Prefix
+            backend:
+              service:
+                name: inventory-service
+                port:
+                  number: 8082
+          # --- payment-service ---------------------------------------------------------------
+          # Health only. /demo/payment-behavior is deliberately absent.
+          - path: /svc/payment/actuator/health
+            pathType: Prefix
+            backend:
+              service:
+                name: payment-service
+                port:
+                  number: 8083
+          # --- fulfillment-service -----------------------------------------------------------
+          # Health only. /demo/consumers/* is deliberately absent.
+          - path: /svc/fulfillment/actuator/health
+            pathType: Prefix
+            backend:
+              service:
+                name: fulfillment-service
+                port:
+                  number: 8084
+          # --- scenario-service --------------------------------------------------------------
+          # Scenario Service's whole /demo surface IS the demo (scenarios, runs, run stream, reset,
+          # event projection) and none of it wedges anything — it has no consumer-pause or
+          # payment-behavior endpoint of its own.
+          - path: /svc/scenario/demo
+            pathType: Prefix
+            backend:
+              service:
+                name: scenario-service
+                port:
+                  number: 8085
+          - path: /svc/scenario/actuator/health
+            pathType: Prefix
+            backend:
+              service:
+                name: scenario-service
+                port:
+                  number: 8085
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: frontend
+  namespace: orderfulfillment
+spec:
+  rules:
+    - http:
+        paths:
+          # Static entry points.
+          - path: /
+            pathType: Exact
+            backend: &frontend
+              service:
+                name: frontend
+                port:
+                  number: 80
+          - path: /index.html
+            pathType: Exact
+            backend: *frontend
+          - path: /favicon.svg
+            pathType: Exact
+            backend: *frontend
+          # Vite's content-hashed build output.
+          - path: /assets
+            pathType: Prefix
+            backend: *frontend
+          # Client-side routes from frontend/src/App.tsx. Prefix (not Exact) because several take
+          # a path parameter: /orders/{id}, /scenario-runs/{id}.
+          - path: /orders
+            pathType: Prefix
+            backend: *frontend
+          - path: /scenarios
+            pathType: Prefix
+            backend: *frontend
+          - path: /scenario-runs
+            pathType: Prefix
+            backend: *frontend
+          - path: /events
+            pathType: Prefix
+            backend: *frontend
+          - path: /health
+            pathType: Prefix
+            backend: *frontend
+          - path: /architecture
+            pathType: Prefix
+            backend: *frontend

@@ -1,0 +1,212 @@
+# CX23 tuning (T2/T3/T4 of docs/agent-reports/sprint-2/deployment-platform-revision.md §3).
+#
+# Everything here is specific to the 2-vCPU / 4 GB demo box and deliberately does NOT go into the
+# base manifests: on an 8-core development machine these numbers would only make failures slower
+# to surface. The one tuning change that IS a strict improvement everywhere — Kafka's readiness
+# probe no longer spawning a JVM per check (T1) — lives in ../03-kafka.yaml instead.
+#
+# Three things are being fixed:
+#
+# T2 — explicit heap caps. Left to itself the JVM takes 25% of the container limit (160 MiB of the
+#      640 MiB limit here) and Kafka takes a flat 1 GB regardless of its limit. Neither number is
+#      chosen with any knowledge of this workload. MaxRAMPercentage=60 gives each service ~384 MiB
+#      of heap and leaves ~256 MiB for metaspace, code cache, thread stacks and direct buffers,
+#      which is the part that gets a container OOMKilled when people set the heap to the limit.
+#      Kafka gets 512 MiB, which §3 records as ample for one broker with this project's topics.
+#
+# T3 — startup is the pressure point, not steady state. Five JVMs and a broker starting at once on
+#      2 vCPUs is exactly the contention Phase 10 measured at 270-406% CPU on an 8-core machine. A
+#      startupProbe is the right tool: while it is running, the liveness and readiness probes are
+#      not evaluated at all, so a slow cold start cannot be read as a failure and cannot restart a
+#      pod that is merely waiting for a CPU slice. It allows up to 5 minutes to come up, then hands
+#      over to the normal probes — which keep their base semantics but with more headroom.
+#
+# T4 — scenario timeouts (scenario-service only) are Spring properties rather than probe settings;
+#      they move via SPRING_PROFILES_ACTIVE=production and live in that service's
+#      application-production.yml. The same env var also turns on W4's idle auto-reset.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+  namespace: orderfulfillment
+spec:
+  template:
+    spec:
+      containers:
+        - name: order-service
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=60.0"
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8081
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-service
+  namespace: orderfulfillment
+spec:
+  template:
+    spec:
+      containers:
+        - name: inventory-service
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=60.0"
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8082
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  namespace: orderfulfillment
+spec:
+  template:
+    spec:
+      containers:
+        - name: payment-service
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=60.0"
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8083
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fulfillment-service
+  namespace: orderfulfillment
+spec:
+  template:
+    spec:
+      containers:
+        - name: fulfillment-service
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=60.0"
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8084
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scenario-service
+  namespace: orderfulfillment
+spec:
+  template:
+    spec:
+      containers:
+        - name: scenario-service
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=60.0"
+            # Activates services/scenario-service/src/main/resources/application-production.yml:
+            # W4's idle auto-reset (15 min) and T4's widened scenario timeouts. This is the only
+            # place in the repo that turns that profile on, which is why the local kind and
+            # Compose flows are unaffected by either.
+            - name: SPRING_PROFILES_ACTIVE
+              value: production
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8085
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+  namespace: orderfulfillment
+spec:
+  template:
+    spec:
+      containers:
+        - name: kafka
+          env:
+            # The apache/kafka image's kafka-server-start.sh sets -Xmx1G -Xms1G when KAFKA_HEAP_OPTS
+            # is unset, ignoring the container limit. 512 MiB against the 1 GiB limit leaves real
+            # room for the broker's off-heap page-cache use.
+            - name: KAFKA_HEAP_OPTS
+              value: "-Xmx512m -Xms512m"
+          startupProbe:
+            tcpSocket:
+              port: 29092
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6

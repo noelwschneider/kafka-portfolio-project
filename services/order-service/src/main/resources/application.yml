@@ -52,6 +52,15 @@ orderfulfillment:
     # rather than retried forever, so a permanently unpublishable row cannot block the queue.
     fail-after-ms: 300000
 
+app:
+  cors:
+    # Single source of truth for allowed browser origins, consumed by both WebConfig (regular
+    # @RestController endpoints) and the actuator CORS block below (a separate
+    # WebMvcEndpointHandlerMapping that does not go through WebConfig). Defaults to the local
+    # Compose/kind value; override with APP_CORS_ALLOWED_ORIGIN_PATTERNS for any deployment where
+    # the frontend isn't served same-origin. Never `*`, never combined with credentials.
+    allowed-origin-patterns: ${APP_CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*}
+
 management:
   endpoints:
     web:
@@ -66,7 +75,7 @@ management:
       # silently blocked by CORS until this was added, even though curl (which doesn't enforce CORS)
       # showed the endpoint working fine. Found via live browser verification, not curl.
       cors:
-        allowed-origin-patterns: "http://localhost:*"
+        allowed-origin-patterns: "${app.cors.allowed-origin-patterns}"
         allowed-methods: GET
   endpoint:
     health:

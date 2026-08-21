@@ -89,6 +89,15 @@ Three things the diagram is meant to make obvious:
 - **A service publishes only to its own topic.** `PaymentRequested` sits on `orders.events` because
   Order Service publishes it (`docs/events/event-catalog.md` §2).
 
+One thing the diagram deliberately does not show, because it is a deployment property rather than an
+architectural one: locally the browser reaches five services on five origins
+(`localhost:8081`–`8085`), while the public demo puts all of them behind a single hostname with
+`/svc/{service}/...` path prefixes. The arrows are the same either way. What changes is that in
+production the **only** routed paths are the `UI -->` arrows above — the `SCN -->` arrows into
+Payment, Inventory and Fulfillment stay cluster-internal and are unreachable from outside, which is
+what keeps a visitor from pausing a consumer or forcing payment rejections directly. See
+`infrastructure/kubernetes/production/common/ingress.yaml` and ADR-010.
+
 ---
 
 ## 2. Happy path — order reaches `FULFILLED`

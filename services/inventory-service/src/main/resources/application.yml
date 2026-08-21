@@ -42,6 +42,12 @@ orderfulfillment:
     # same local transaction as the business change). Created by V4__processed_events.sql.
     processed-events-table: inventory_service.processed_events
 
+app:
+  cors:
+    # Single source of truth for allowed browser origins (WebConfig + the actuator CORS block
+    # below). Override with APP_CORS_ALLOWED_ORIGIN_PATTERNS; never `*`, never with credentials.
+    allowed-origin-patterns: ${APP_CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*}
+
 management:
   endpoints:
     web:
@@ -53,7 +59,7 @@ management:
       # Actuator's WebMvcEndpointHandlerMapping bypasses WebConfig's regular CORS mapping — without
       # this, browser calls to /actuator/health are blocked even though curl works fine.
       cors:
-        allowed-origin-patterns: "http://localhost:*"
+        allowed-origin-patterns: "${app.cors.allowed-origin-patterns}"
         allowed-methods: GET
   endpoint:
     health:

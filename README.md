@@ -7,6 +7,17 @@ retries, DLQ routing, inventory contention), not the catalog around it. See
 `docs/planning/project-overview.md` for the full purpose/scope statement, and `docs/planning/`
 generally for the design docs behind everything in this repo.
 
+## Live demo
+
+A hosted instance is on the way: the repo-side work is done, but the server it runs on is being
+provisioned separately, so **there is no public URL yet**. The link will land here once it exists.
+
+When it does, know what you are clicking: it is a **shared public sandbox**. Anyone can run the
+failure scenarios, several people can be running them at once, and the system resets itself after a
+period of inactivity — so inventory levels, orders and scenario runs may change or disappear while
+you are looking at them. That is the demo working as intended, not a bug. Everything below runs the
+same system locally, where the only person changing state is you.
+
 ## Prerequisites
 
 - Docker (with Compose v2 — `docker compose`, not the standalone `docker-compose` binary)
@@ -189,6 +200,15 @@ Prerequisites: `kind` (`brew install kind`) and `kubectl`, plus Docker (already 
    ```
 
    Frontend: **http://localhost:5173**
+
+   `infrastructure/kubernetes/` holds only what this local flow needs. The public demo box runs the
+   same manifests through an additive overlay in `infrastructure/kubernetes/production/`, which adds
+   a Traefik ingress whose path allowlist replaces the NodePorts (they become `ClusterIP` there),
+   generates the Postgres password at apply time instead of using the committed dev one, and tunes
+   heaps and probes for a 2-vCPU box. Nothing in that directory affects the commands above —
+   `kubectl apply -f infrastructure/kubernetes/` is unchanged by its existence. See that directory's
+   README, and `docs/adr/ADR-010-k3s-on-a-dedicated-hetzner-vps-for-the-public-demo.md` for why the
+   deployment looks the way it does.
 
 5. Tear down when you're done — a `kind` cluster is fully ephemeral, so this is a clean full wipe,
    not the "keep the volume" caution that applies to the Compose Postgres data:

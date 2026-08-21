@@ -72,8 +72,19 @@ spec:
             - name: kafka-data
               mountPath: /var/lib/kafka/data
           readinessProbe:
-            exec:
-              command: ["/opt/kafka/bin/kafka-broker-api-versions.sh", "--bootstrap-server", "localhost:9092"]
+            # TCP check on the INTERNAL listener (29092) — the port the five backend Deployments
+            # actually connect to, so readiness gates the Service endpoints on the listener that
+            # matters. This deliberately replaced an exec probe running
+            # kafka-broker-api-versions.sh, which starts a *second JVM inside this container on
+            # every probe*: docs/agent-reports/sprint-1/phase-10-scaling-demo.md identified that
+            # probe as what began timing out under CPU contention, flapping the broker
+            # Ready/NotReady and taking the Kafka Service's endpoints to zero. The cost of a
+            # cheaper probe is stated honestly: a TCP accept proves the listener is bound, not
+            # that the broker will answer a metadata request, so it is a weaker liveness-of-
+            # protocol signal than the old exec check. That trade is worth it — the old check's
+            # own CPU cost was the failure mode it was supposed to detect.
+            tcpSocket:
+              port: 29092
             initialDelaySeconds: 15
             periodSeconds: 5
             timeoutSeconds: 5

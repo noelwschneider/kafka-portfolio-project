@@ -1,0 +1,59 @@
+# The production overlay as actually deployed to the demo box: everything in ../ plus real
+# registry image references.
+#
+#   kubectl apply -k infrastructure/kubernetes/production/ghcr
+#
+# BEFORE FIRST USE: replace OWNER below with the GitHub account or organization that owns this
+# repository. The repo has no `origin` remote yet, so that value cannot be filled in here — see
+# .github/workflows/build-images.yml, which derives the same path automatically from
+# ${{ github.repository }} at build time and prints the exact image names it pushed.
+#
+# Why the image references live here rather than in ../kustomization.yaml: ../ has to stay
+# renderable and verifiable without a registry (see ../local-verify), and the registry path is the
+# one piece of the production configuration that is an environment fact rather than a design
+# decision.
+#
+# k3s pulls these itself via containerd — no `docker` on the box, no `kind load`, no
+# `k3s ctr images import`. Public GHCR packages need no imagePullSecret.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../common
+
+images:
+  - name: order-service
+    newName: ghcr.io/OWNER/kafka-portfolio-project/order-service
+    newTag: latest
+  - name: inventory-service
+    newName: ghcr.io/OWNER/kafka-portfolio-project/inventory-service
+    newTag: latest
+  - name: payment-service
+    newName: ghcr.io/OWNER/kafka-portfolio-project/payment-service
+    newTag: latest
+  - name: fulfillment-service
+    newName: ghcr.io/OWNER/kafka-portfolio-project/fulfillment-service
+    newTag: latest
+  - name: frontend
+    newName: ghcr.io/OWNER/kafka-portfolio-project/frontend
+    newTag: latest
+  - name: scenario-service
+    newName: ghcr.io/OWNER/kafka-portfolio-project/scenario-service
+    newTag: latest
+
+patches:
+  # The base manifests use IfNotPresent, which is right for `kind load`ed :local images and wrong
+  # for a mutable :latest tag from a registry — a redeploy would keep the cached layer forever.
+  # Pin an immutable tag (the workflow also pushes one tagged with the commit SHA) and this can go
+  # back to IfNotPresent.
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      # kustomize treats this as a regex; postgres and kafka are excluded on purpose (they use
+      # upstream images with their own pinned tags).
+      name: "^(order-service|inventory-service|payment-service|fulfillment-service|scenario-service|frontend)$"
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Always

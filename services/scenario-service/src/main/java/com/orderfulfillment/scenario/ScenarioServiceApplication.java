@@ -7,6 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Scenario Service — Phase 5. The demo/fault-injection control layer (docs/openapi/scenario-service.yaml),
@@ -20,6 +21,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
  */
 @SpringBootApplication
 @EnableAsync
+@EnableScheduling
 @ConfigurationPropertiesScan
 @ComponentScan(
         basePackages = {"com.orderfulfillment.scenario", "com.orderfulfillment.common"},

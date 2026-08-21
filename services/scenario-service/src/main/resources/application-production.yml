@@ -1,0 +1,34 @@
+# Production profile overrides (activate with SPRING_PROFILES_ACTIVE=production, which
+# infrastructure/kubernetes/production/common/patch-tuning.yaml sets on the scenario-service
+# Deployment and nothing else in the repo does — so neither block below can affect the local
+# Compose or kind flows).
+#
+# Two things live here:
+#
+#   1. W4's idle auto-reset — see application.yml's orderfulfillment.idle-reset block and
+#      com.orderfulfillment.scenario.admin.IdleResetScheduler for what it does and why it is
+#      deliberately off everywhere else.
+#   2. T4's widened scenario timeouts for the 2-vCPU demo box (see
+#      docs/agent-reports/sprint-2/deployment-platform-revision.md §3).
+orderfulfillment:
+  idle-reset:
+    enabled: true
+  scenario:
+    # T4. The defaults in application.yml were tuned against an 8-vCPU development machine; the
+    # demo box has 2. Each value below is 3x its default, which is roughly the ratio of available
+    # cores, applied to the three timeouts that bound *waiting for work to finish* — not to
+    # anything that changes what a scenario does. Burst size (60) and submission concurrency (20)
+    # are deliberately unchanged, so the scenarios still demonstrate exactly what they demonstrate
+    # locally.
+    #
+    # These numbers are provisional: they are a headroom estimate, not a measurement, because
+    # there was no CX23 to measure against when they were written. The deployment session should
+    # confirm on the real box that the high-volume scenario *completes* — every order reaching
+    # FULFILLED in the run record, consumer lag returning to zero — rather than merely no longer
+    # reporting a timeout. A wider timeout that hides orders which never finish would be worse
+    # than the false failure it replaced. If the burst genuinely cannot keep up, the next lever is
+    # lowering high-volume-submission-concurrency (which bounds how fast this service submits),
+    # not widening these further.
+    order-poll-timeout-ms: 60000
+    high-volume-lag-poll-timeout-ms: 180000
+    high-volume-order-watch-timeout-ms: 180000

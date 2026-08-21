@@ -59,6 +59,20 @@ orderfulfillment:
     # load, even though the order itself reaches FULFILLED promptly (see OrderStatusWatcher's
     # per-call timeout overload).
     high-volume-order-watch-timeout-ms: 60000
+  idle-reset:
+    # W4 (docs/agent-reports/sprint-2/deployment-code-changes-briefing.md): scheduled auto-reset for
+    # a demo box left stuck after a scenario dies mid-run. Off by default — a reset firing during
+    # local development would be confusing — see application-production.yml for the profile that
+    # turns it on. IdleResetScheduler is not even created as a bean unless this is true.
+    enabled: false
+    idle-period-ms: 900000 # 15 minutes — see the briefing's "Open questions" (now closed).
+    check-interval-ms: 60000
+
+app:
+  cors:
+    # Single source of truth for allowed browser origins (WebConfig + the actuator CORS block
+    # below). Override with APP_CORS_ALLOWED_ORIGIN_PATTERNS; never `*`, never with credentials.
+    allowed-origin-patterns: ${APP_CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*}
 
 management:
   endpoints:
@@ -71,7 +85,7 @@ management:
       # Actuator's WebMvcEndpointHandlerMapping bypasses WebConfig's regular CORS mapping — without
       # this, browser calls to /actuator/health are blocked even though curl works fine.
       cors:
-        allowed-origin-patterns: "http://localhost:*"
+        allowed-origin-patterns: "${app.cors.allowed-origin-patterns}"
         allowed-methods: GET
   endpoint:
     health:

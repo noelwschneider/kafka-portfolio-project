@@ -1,0 +1,107 @@
+# Production overlay for the public demo box (single-node k3s on a Hetzner CX23 — see
+# docs/adr/ADR-010-deployment-platform-k3s-on-hetzner.md).
+#
+# Render or apply it with:
+#   kubectl kustomize infrastructure/kubernetes/production        # inspect
+#   kubectl apply -k  infrastructure/kubernetes/production        # apply
+#
+# What this overlay does to the base manifests in ../:
+#   1. Omits ../../01-secrets.yaml entirely. The committed Postgres password is fine for a throwaway
+#      kind cluster and not for a public box; production generates that Secret imperatively first
+#      (see README.md in this directory and create-postgres-secret.sh — W7).
+#   2. Turns the six application Services from NodePort into ClusterIP, so the only way in is the
+#      Ingress allowlist in ingress.yaml. A reachable NodePort would bypass that allowlist
+#      completely, which is why this is a patch and not a suggestion.
+#   3. Adds the Traefik Ingress + StripPrefix middleware (ingress.yaml).
+#   4. Applies the CX23 tuning from docs/agent-reports/sprint-2/deployment-platform-revision.md §3:
+#      explicit JVM heap caps and relaxed probe timings for a 2-vCPU box (patch-tuning.yaml).
+#   5. Turns on the scenario-service `production` Spring profile (idle auto-reset, W4, plus the
+#      widened scenario timeouts for slower hardware).
+#
+# It does NOT set image names: the base manifests' `<service>:local` tags are kept so this overlay
+# renders and can be verified without a registry. Deploying to the box goes through ./ghcr, which
+# layers the real GHCR image references on top of this. Local verification goes through
+# ./local-verify. See README.md.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../00-namespace.yaml
+  # ../../01-secrets.yaml is deliberately absent — see note 1 above.
+  - ../../02-postgres.yaml
+  - ../../03-kafka.yaml
+  - ../../04-order-service.yaml
+  - ../../05-inventory-service.yaml
+  - ../../06-payment-service.yaml
+  - ../../07-fulfillment-service.yaml
+  - ../../08-scenario-service.yaml
+  - ../../09-frontend.yaml
+  - ingress.yaml
+
+patches:
+  # --- NodePort -> ClusterIP for all six application Services -------------------------------
+  # JSON 6902 rather than a strategic merge: removing the `nodePort` field is an explicit
+  # operation here, instead of relying on how a null merges into a keyed list.
+  - target:
+      version: v1
+      kind: Service
+      name: order-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      version: v1
+      kind: Service
+      name: inventory-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      version: v1
+      kind: Service
+      name: payment-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      version: v1
+      kind: Service
+      name: fulfillment-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      version: v1
+      kind: Service
+      name: scenario-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      version: v1
+      kind: Service
+      name: frontend
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+
+  # --- CX23 tuning: heap caps, probe timings, production Spring profile ----------------------
+  - path: patch-tuning.yaml

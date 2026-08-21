@@ -1,0 +1,59 @@
+#cloud-config
+# Provisioning template for the kafka-portfolio-project remote dev box (Hetzner cpx32).
+# The placeholder token below (search for it under ssh_authorized_keys) is substituted by
+# dev-up.sh with the contents of the dedicated ~/.ssh/kafka-portfolio-dev-box.pub key before
+# this is sent as server create user-data.
+#
+# Goals: no password auth, no usable root login, a non-root sudo user for day-to-day work,
+# Docker + kind + kubectl installed and ready.
+
+ssh_pwauth: false
+disable_root: true
+
+users:
+  - name: dev
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    ssh_authorized_keys:
+      - __SSH_PUBLIC_KEY__
+
+write_files:
+  - path: /etc/ssh/sshd_config.d/99-hardening.conf
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin prohibit-password
+      ChallengeResponseAuthentication no
+
+package_update: true
+package_upgrade: false
+
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - apt-transport-https
+
+runcmd:
+  # --- Docker Engine (official convenience script covers docker + compose plugin) ---
+  - curl -fsSL https://get.docker.com -o /root/get-docker.sh
+  - sh /root/get-docker.sh
+  - usermod -aG docker dev
+
+  # --- kubectl ---
+  - curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+  - chmod +x /usr/local/bin/kubectl
+
+  # --- kind ---
+  - curl -fsSL -o /usr/local/bin/kind https://kind.sigs.k8s.io/dl/v0.23.0/kind-linux-amd64
+  - chmod +x /usr/local/bin/kind
+
+  # --- sshd hardening takes effect ---
+  - systemctl restart ssh || systemctl restart sshd
+
+  # --- marker file so dev-up.sh can poll for "cloud-init actually finished", not just SSH-reachable ---
+  - touch /home/dev/.dev-box-ready
+  - chown dev:dev /home/dev/.dev-box-ready
+
+final_message: "kafka-portfolio-dev-box ready after $UPTIME seconds"
