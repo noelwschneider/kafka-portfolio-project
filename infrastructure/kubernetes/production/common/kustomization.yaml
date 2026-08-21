@@ -17,6 +17,9 @@
 #      explicit JVM heap caps and relaxed probe timings for a 2-vCPU box (patch-tuning.yaml).
 #   5. Turns on the scenario-service `production` Spring profile (idle auto-reset, W4, plus the
 #      widened scenario timeouts for slower hardware).
+#   6. Adds the inventory-service HorizontalPodAutoscaler (../../10-inventory-service-hpa.yaml).
+#      Relies on k3s's own bundled metrics-server for the metrics.k8s.io API it reads from — this
+#      overlay does NOT add ../../11-metrics-server.yaml (that file is kind-only, see its header).
 #
 # It does NOT set image names: the base manifests' `<service>:local` tags are kept so this overlay
 # renders and can be verified without a registry. Deploying to the box goes through ./ghcr, which
@@ -36,6 +39,10 @@ resources:
   - ../../07-fulfillment-service.yaml
   - ../../08-scenario-service.yaml
   - ../../09-frontend.yaml
+  - ../../10-inventory-service-hpa.yaml
+  # ../../11-metrics-server.yaml is deliberately absent here — k3s bundles its own metrics-server
+  # by default, and applying this project's kind-tuned copy (with --kubelet-insecure-tls) on top
+  # of it would install a second, conflicting one. See that file's header comment.
   - ingress.yaml
 
 patches:

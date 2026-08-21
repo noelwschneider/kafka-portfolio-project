@@ -263,3 +263,37 @@ Stated plainly so no diagram above is read as promising more than the implementa
   original race deterministically), not merely a documentation intent. It does not make delivery
   exactly-once; it makes the aggregate's *observed* status sequence always valid even though the
   underlying events can still arrive out of order.
+
+---
+
+## 6. Scaling
+
+`docs/agent-reports/sprint-1/phase-10-scaling-demo.md` first showed this system's horizontal-scaling
+story by hand: `kubectl scale deployment/inventory-service --replicas=N` against Scenario 8
+("High-Volume Batch," `docs/scenarios.md`), and measured its limits — the local `kind` Docker
+Desktop VM's ~3.8GB ceiling meant 3 replicas of Inventory Service alongside the rest of the 8-pod
+stack pushed the node into CPU/memory contention and Kafka readiness-probe flapping before any
+scenario load was even applied.
+
+Inventory Service is Scenario 8's consumer group: every `OrderCreated` on `orders.events` triggers a
+reservation write, so it's the service that visibly saturates under that scenario's burst. It's also
+the natural ceiling case for *this* topic: `orders.events` has a fixed 3-partition count
+(`docs/db-ownership.md`), and a Kafka consumer group can never usefully run more consumers than
+partitions — a 4th replica would sit idle.
+
+A `HorizontalPodAutoscaler` (`infrastructure/kubernetes/10-inventory-service-hpa.yaml`) now formalizes
+that manual story: `minReplicas: 1`, `maxReplicas: 3`, targeting 65% average CPU utilization against
+Inventory Service's 150m request, fed by `metrics-server`
+(`infrastructure/kubernetes/11-metrics-server.yaml`, `kind` only — the production overlay relies on
+k3s's own bundled metrics-server instead, see that overlay's `kustomization.yaml`). A fast scale-up
+policy (no stabilization delay) and a 2-minute scale-down stabilization window keep a burst's scale-up
+responsive without the HPA flapping a pod in and out right after the burst clears.
+
+Verified for real on the Hetzner dev box (`infrastructure/dev-box/`, more CPU/memory headroom than the
+laptop's Docker Desktop VM) running Scenario 8 against a live `kind` cluster — real `kubectl get hpa` /
+`kubectl describe hpa` output, not a hypothetical: CPU utilization crossed the 65% target after the
+burst's submitted orders started draining, the HPA rescaled Inventory Service from 1 to 2 replicas
+(`SuccessfulRescale ... New size: 2; reason: cpu resource utilization (percentage of request) above
+target`), and once the backlog drained and utilization stayed low past the stabilization window it
+scaled back down to 1 (`SuccessfulRescale ... New size: 1; reason: All metrics below target`). Full
+transcript and analysis in `docs/agent-reports/sprint-2/hpa-scaling-demo.md`.
