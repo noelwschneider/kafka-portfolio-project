@@ -3,10 +3,8 @@
 #
 #   kubectl apply -k infrastructure/kubernetes/production/ghcr
 #
-# BEFORE FIRST USE: replace OWNER below with the GitHub account or organization that owns this
-# repository. The repo has no `origin` remote yet, so that value cannot be filled in here — see
-# .github/workflows/build-images.yml, which derives the same path automatically from
-# ${{ github.repository }} at build time and prints the exact image names it pushed.
+# Images live at ghcr.io/noelwschneider/kafka-portfolio-project/{service} — matches what
+# .github/workflows/build-images.yml derives from ${{ github.repository }} at build time.
 #
 # Why the image references live here rather than in ../kustomization.yaml: ../ has to stay
 # renderable and verifiable without a registry (see ../local-verify), and the registry path is the
@@ -23,22 +21,22 @@ resources:
 
 images:
   - name: order-service
-    newName: ghcr.io/OWNER/kafka-portfolio-project/order-service
+    newName: ghcr.io/noelwschneider/kafka-portfolio-project/order-service
     newTag: latest
   - name: inventory-service
-    newName: ghcr.io/OWNER/kafka-portfolio-project/inventory-service
+    newName: ghcr.io/noelwschneider/kafka-portfolio-project/inventory-service
     newTag: latest
   - name: payment-service
-    newName: ghcr.io/OWNER/kafka-portfolio-project/payment-service
+    newName: ghcr.io/noelwschneider/kafka-portfolio-project/payment-service
     newTag: latest
   - name: fulfillment-service
-    newName: ghcr.io/OWNER/kafka-portfolio-project/fulfillment-service
+    newName: ghcr.io/noelwschneider/kafka-portfolio-project/fulfillment-service
     newTag: latest
   - name: frontend
-    newName: ghcr.io/OWNER/kafka-portfolio-project/frontend
+    newName: ghcr.io/noelwschneider/kafka-portfolio-project/frontend
     newTag: latest
   - name: scenario-service
-    newName: ghcr.io/OWNER/kafka-portfolio-project/scenario-service
+    newName: ghcr.io/noelwschneider/kafka-portfolio-project/scenario-service
     newTag: latest
 
 patches:
