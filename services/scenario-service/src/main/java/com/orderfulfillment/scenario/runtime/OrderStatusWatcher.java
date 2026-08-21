@@ -97,15 +97,22 @@ public class OrderStatusWatcher {
      * live against the Phase 8 {@code kind} cluster (docs/agent-reports/phase-10-scaling-demo.md) —
      * dozens of orders watched concurrently each open their own long-lived
      * {@code GET /api/orders/stream} connection against one resource-constrained Order Service pod,
-     * and under that load Order Service's SSE emitter can error out in a way its own
-     * {@code GlobalExceptionHandler} cannot recover from ({@code HttpMessageNotWritableException}:
-     * no converter for an error body once the response's content-type is already committed to
-     * {@code text/event-stream}), corrupting that connection's status trace. The underlying
-     * workflow is unaffected (confirmed live: every consumer group's lag was 0, i.e. every event was
-     * actually processed) — only this scenario's own high-concurrency SSE fan-out triggers it, so
-     * this scenario avoids it at the source rather than working around the symptom with longer
-     * timeouts. Fixing Order Service's SSE emitter under concurrent load is out of this phase's
-     * scope (application code in a different service) and is flagged, not fixed, here.
+     * and under that load a dead connection's own SSE emitter error dispatch could reach Order
+     * Service's shared {@code GlobalExceptionHandler}, which tried to write a JSON error body onto a
+     * response already committed to {@code text/event-stream} — no {@code HttpMessageConverter}
+     * supports that, so it threw {@code HttpMessageNotWritableException}, corrupting that
+     * connection's status trace. The underlying workflow was unaffected even before the fix
+     * (confirmed live: every consumer group's lag was 0, i.e. every event was actually processed).
+     *
+     * <p><b>Fixed in Sprint 2 goal 2, item 3</b> — {@code GlobalExceptionHandler} (shared by every
+     * service) now has a dedicated, void-returning {@code @ExceptionHandler} for
+     * {@code AsyncRequestNotUsableException} (the exception a broken streaming connection actually
+     * raises) that logs at DEBUG and writes nothing, instead of falling through to the catch-all that
+     * tried to render a JSON body. See
+     * {@code OrderStatusStreamOwnErrorIntegrationTest} in order-service for the reproduction and
+     * fix verification. This method (and the high-concurrency-avoids-SSE design it exists for) is
+     * kept as-is regardless: Scenario 8 still benefits from not opening dozens of long-lived SSE
+     * connections against one pod purely for cost/scale reasons, independent of this fix.
      */
     public String awaitTerminalPollOnly(String runId, String orderId, long timeoutMs) {
         long deadline = System.currentTimeMillis() + timeoutMs;

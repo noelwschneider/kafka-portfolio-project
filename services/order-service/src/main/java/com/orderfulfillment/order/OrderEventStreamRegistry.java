@@ -114,8 +114,8 @@ class OrderEventStreamRegistry {
                     // either way there is nothing left to deliver to; the emitter's own
                     // onError/onCompletion callback removes it from the map.
                     log.debug("Dropping SSE emitter for order stream after send failure", ex);
-                    emitter.completeWithError(ex);
                     emitters.remove(emitter);
+                    completeWithErrorQuietly(emitter, ex);
                 }
             }
         });
@@ -127,11 +127,33 @@ class OrderEventStreamRegistry {
                 try {
                     emitter.send(SseEmitter.event().comment("keep-alive"));
                 } catch (IOException | IllegalStateException ex) {
-                    emitter.completeWithError(ex);
                     emitters.remove(emitter);
+                    completeWithErrorQuietly(emitter, ex);
                 }
             }
         });
+    }
+
+    /**
+     * {@code SseEmitter#completeWithError} can itself throw once the client's connection has broken
+     * badly enough that the async context is no longer usable — observed live under a high-volume
+     * concurrent-SSE-fan-out test (sprint-2 bug hunt) as a second, uncaught
+     * {@code AsyncRequestNotUsableException} escaping the {@code catch} block above it was thrown
+     * from. {@link #broadcast} and {@link #sendKeepAlive} both run synchronously on whatever thread
+     * triggered them — for {@code broadcast}, that is the thread committing the business transaction
+     * that produced the event ({@code OrderStatusStreamListener} is a {@code @TransactionalEventListener}
+     * running in the caller's own thread), so letting a second exception escape here does not just
+     * fail to clean up one dead SSE connection — it fails that unrelated caller's own HTTP request
+     * (e.g. a {@code POST /api/orders} whose transaction had already committed successfully). The
+     * emitter is already removed from {@link #emitters} by the caller before this runs, so there is
+     * nothing further to clean up here regardless of outcome.
+     */
+    private void completeWithErrorQuietly(SseEmitter emitter, Exception cause) {
+        try {
+            emitter.completeWithError(cause);
+        } catch (RuntimeException cleanupEx) {
+            log.debug("Ignoring failure while completing an already-broken SSE emitter", cleanupEx);
+        }
     }
 
     @PreDestroy
