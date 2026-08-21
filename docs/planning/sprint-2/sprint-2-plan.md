@@ -26,12 +26,17 @@
    tuning items), **W2–W5 and W7 are already done**; **W1, W6, W8, and T1–T4 remain**, all now
    unblocked since the platform question is settled. **Actual provisioning and deploy** continues in
    the same deployment agent session that made the platform decision.
-5. **README Demo Walkthrough** — a short recording or annotated GIFs near the top of the README,
-   showing the app actually working.
+5. ~~**README Demo Walkthrough**~~ — **deferred out of this sprint.** A recording is only worth doing
+   against a frontend that looks finished, and any accompanying copy belongs with a broader content
+   pass rather than a one-off addition. Split into two future sprints instead: a **frontend polish
+   sprint** (visual/UX pass) recorded only once that lands, and a separate **documentation sprint**
+   for README and other content updates. Neither is scheduled yet.
 6. **Autoscaler (HorizontalPodAutoscaler)** — formalizes the manual-scaling story from Phase 10 into
    an actual autoscaler.
 7. **Bug Hunt** — a time-boxed pass (half a day to a day) focused on concurrency and partial-failure
    paths, the two categories that have produced real bugs so far (per ADR-009 and the SSE defect).
+   Starting item already flagged: unmapped paths return 500 instead of 404, found during deployment
+   verification (`docs/agent-reports/sprint-2/deployment-execution-report.md`, item 4).
 
 ## Deployment decision
 
@@ -67,11 +72,13 @@ minutes.
 ## Dependencies
 
 ```
-security ──► deploy code changes (W1–W8) ──► provision + deploy ──► readme
+security ──► deploy code changes (W1–W8) ──► provision + deploy
 open gaps
 vps ──► autoscaler
     └─► bug hunt
 ```
+
+`readme` is removed from this chart — it's deferred out of the sprint (see goal 5).
 
 - `security` and `open gaps` have no dependencies and can start immediately.
 - The deployment session's own recommended sequencing is **security → code changes → provision and
@@ -97,9 +104,9 @@ trigger once auto-deploy (post-`deploy`) becomes something actually wanted.
 
 ## Definition of done
 
-All seven goals delivered, or explicitly re-scoped mid-sprint with a documented reason. `deploy` is
-the most likely candidate for that: it's a spike by design, and if it runs long the right move is
-landing a decision plus a follow-up item, not letting it absorb the sprint.
+Goals 1–4, 6, and 7 delivered, or explicitly re-scoped mid-sprint with a documented reason. Goal 5
+(README) is already re-scoped out of this sprint per above and isn't part of this sprint's
+definition of done.
 
 ## Planning docs this sprint needs
 
