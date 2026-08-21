@@ -55,9 +55,20 @@ spec:
           value: 1
           periodSeconds: 60
     scaleUp:
-      # Keep the default fast-react scale-up policy (0s stabilization) — the whole point of this
-      # demo is watching pods actually get added while a burst is still draining.
-      stabilizationWindowSeconds: 0
+      # Originally 0s (react instantly) so a burst's scale-up is visible while it's still
+      # draining. A same-night incident showed the cost of that: right after a deploy restarts all
+      # five backend services (see ADR-011), five JVMs cold-starting at once produce a CPU spike
+      # from class loading and Spring context init, not real request load — and at 0s
+      # stabilization the HPA read that spike as sustained demand and added two more
+      # inventory-service replicas during the exact window the box had the least spare memory,
+      # causing a second outage on top of the first. 60s filters that out: cold-start CPU settles
+      # within tens of seconds once the JVM finishes initializing, while a genuine Scenario 8 burst
+      # (which drains over 12-22s per docs/agent-reports/sprint-2/hpa-scaling-demo.md, but keeps
+      # inventory-service busy for longer than that as orders queue) stays elevated well past 60s
+      # and still triggers a real scale-up — just not an instantaneous one. The CPU threshold
+      # itself (65%, above) is unchanged: it's already validated against real load and isn't what
+      # caused this.
+      stabilizationWindowSeconds: 60
       policies:
         - type: Pods
           value: 2

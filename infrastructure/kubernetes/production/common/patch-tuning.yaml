@@ -24,12 +24,37 @@
 # T4 — scenario timeouts (scenario-service only) are Spring properties rather than probe settings;
 #      they move via SPRING_PROFILES_ACTIVE=production and live in that service's
 #      application-production.yml. The same env var also turns on W4's idle auto-reset.
+#
+# T5 — maxSurge: 0 on all five backend Deployments. Kubernetes' default rolling-update strategy
+#      (maxSurge: 25%, maxUnavailable: 25%) starts the new pod before tearing down the old one, so
+#      restarting a single-replica Deployment briefly runs old and new together. That is fine on a
+#      box with headroom; it is not fine here. Sprint 2 added a per-service outbox-dispatcher
+#      thread and retention-scheduler thread (ADR-006), and a same-night incident showed the
+#      result: `kubectl rollout restart deployment` against all five backend Deployments at once
+#      tried to briefly run ten JVMs' worth of memory on a 4 GB box with no swap, which pushed
+#      memory to 100%, made the box thrash, and took the k3s API server itself unresponsive — too
+#      overloaded to notice the new pods had failed readiness, so it never rolled back the old ones
+#      either, and the deadlock did not self-resolve without a manual reboot.
+#      `maxSurge: 0, maxUnavailable: 1` (the default for a single-replica Deployment) tears the old
+#      pod down before starting the new one, so the fleet's memory footprint never exceeds its
+#      steady-state size during a deploy. The cost is a few seconds of per-service unavailability
+#      while the new pod starts, which is acceptable for this demo. See
+#      docs/adr/ADR-011-sequential-production-rollouts-to-avoid-memory-exhaustion.md. This is a
+#      Deployment strategy, not a resource number, so it is unconditionally correct for the demo
+#      box regardless of future capacity changes — it does not belong in the same conditional as
+#      the heap caps and probe timing above, but lives alongside them here per this directory's
+#      existing convention of one file for CX23-only Deployment patches.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: order-service
   namespace: orderfulfillment
 spec:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   template:
     spec:
       containers:
@@ -60,6 +85,11 @@ metadata:
   name: inventory-service
   namespace: orderfulfillment
 spec:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   template:
     spec:
       containers:
@@ -90,6 +120,11 @@ metadata:
   name: payment-service
   namespace: orderfulfillment
 spec:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   template:
     spec:
       containers:
@@ -120,6 +155,11 @@ metadata:
   name: fulfillment-service
   namespace: orderfulfillment
 spec:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   template:
     spec:
       containers:
@@ -150,6 +190,11 @@ metadata:
   name: scenario-service
   namespace: orderfulfillment
 spec:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   template:
     spec:
       containers:

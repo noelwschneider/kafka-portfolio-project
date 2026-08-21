@@ -12,11 +12,12 @@ Layout:
 | --- | --- |
 | `common/` | The overlay itself — the base manifests minus the dev Secret, plus the ingress, the `ClusterIP` patch and the CX23 tuning |
 | `common/ingress.yaml` | Traefik `Ingress` + `StripPrefix` middleware. **The path allowlist is the demo's security boundary** — read the header comment before editing |
-| `common/patch-tuning.yaml` | JVM heap caps, `startupProbe`s, relaxed probe timings for a 2-vCPU box |
+| `common/patch-tuning.yaml` | JVM heap caps, `startupProbe`s, relaxed probe timings for a 2-vCPU box, and `maxSurge: 0` on the five backend Deployments |
 | `ghcr/` | The overlay as deployed: `common/` plus real GHCR image references |
 | `local-verify/` | The same overlay against locally-built `kind` images, so the whole thing can be exercised without a registry |
 | `render.sh` | Renders any of the above to stdout, to be piped into `kubectl apply -f -` |
 | `create-postgres-secret.sh` | Generates the Postgres `Secret` at apply time instead of using the committed dev password |
+| `redeploy.sh` | Restarts the five backend Deployments one at a time, waiting for each to become healthy before starting the next |
 
 ## Deploying
 
@@ -37,6 +38,26 @@ a flag `kubectl kustomize` accepts and `kubectl apply -k` does not. The alternat
 `kustomization.yaml` inside `infrastructure/kubernetes/`, would break the local flow, because
 `kubectl apply -f infrastructure/kubernetes/` applies every YAML file in that directory. Keeping the
 base directory pure Kubernetes objects is the constraint; the script is the price.
+
+## Redeploying
+
+After new images are pushed to GHCR (or to pick up a Secret rotation), restart the running
+Deployments to pull them:
+
+```bash
+infrastructure/kubernetes/production/redeploy.sh
+```
+
+**Do not use `kubectl rollout restart deployment -n orderfulfillment`** (restarts every backend
+Deployment in the namespace at once) or `kubectl rollout restart deployment/<name>` run manually
+five times in a row without waiting between them. Either one can put old and new pods of multiple
+services in memory at the same time on a box with no spare RAM and no swap — that combination took
+the demo box down for a full outage; see
+`docs/adr/ADR-011-sequential-production-rollouts-to-avoid-memory-exhaustion.md`. `redeploy.sh`
+restarts the five backend Deployments one at a time and waits for
+`kubectl rollout status` to confirm each is healthy before restarting the next, so the fleet never
+needs more than one service's worth of extra memory during the restart, and a stuck rollout for one
+service fails loudly instead of compounding into a second one.
 
 `ghcr/kustomization.yaml` points at `ghcr.io/noelwschneider/kafka-portfolio-project/{service}`,
 the same path `.github/workflows/build-images.yml` derives from `${{ github.repository }}` at build
@@ -61,10 +82,13 @@ entirely, so this is not cosmetic. It is one of two independent defenses; the ot
 firewall blocking 30000–32767, which belongs to the provisioning task and is not in this repo.
 
 **CX23 tuning (`common/patch-tuning.yaml`).** Explicit heap caps and `startupProbe`s, sized for
-2 vCPU. The rationale is in `docs/agent-reports/sprint-2/deployment-platform-revision.md` §3 and
-summarized in ADR-010; the file's own header comment explains each number. One related change is
-*not* here: Kafka's readiness probe no longer spawns a JVM per check, which is a strict improvement
-locally too, so it lives in the base `03-kafka.yaml`.
+2 vCPU, plus `maxSurge: 0` on the five backend Deployments so a rolling update tears the old pod
+down before starting the new one instead of briefly running both
+(`docs/adr/ADR-011-sequential-production-rollouts-to-avoid-memory-exhaustion.md`). The heap/probe
+rationale is in `docs/agent-reports/sprint-2/deployment-platform-revision.md` §3 and summarized in
+ADR-010; the file's own header comment explains each number. One related change is *not* here:
+Kafka's readiness probe no longer spawns a JVM per check, which is a strict improvement locally too,
+so it lives in the base `03-kafka.yaml`.
 
 **`SPRING_PROFILES_ACTIVE=production` on scenario-service.** Turns on the idle auto-reset (15
 minutes) and the widened scenario timeouts in that service's `application-production.yml`. Nothing
@@ -94,7 +118,7 @@ kubectl create secret generic postgres-credentials \
 ```
 
 Rotation: re-run `create-postgres-secret.sh --rotate` and
-`kubectl rollout restart deployment -n orderfulfillment`. There is no automatic rotation; this is a
+`infrastructure/kubernetes/production/redeploy.sh`. There is no automatic rotation; this is a
 manual-ops box.
 
 ## Verifying the overlay locally
