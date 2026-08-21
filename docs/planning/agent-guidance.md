@@ -36,6 +36,45 @@ here rather than letting later sprints silently drift from what's written.
 
 ---
 
+## GitHub Project board
+
+The [Kafka Portfolio Project](https://github.com/users/noelwschneider/projects/7) board is the
+operational tracking layer. It does not replace the sprint plan docs — the board tracks live status;
+`docs/planning/sprint-N/sprint-N-plan.md` still owns the narrative (goals, dependencies, tradeoffs,
+rationale). Don't duplicate rationale into board item descriptions, and don't try to track live status
+in the markdown docs — each artifact does the job the other one is bad at.
+
+**Fields:** `Status` (`Backlog` → `Planned` → `In Progress` → `Done`), `Priority` (`Tier 1` / `Tier 2`
+/ `Shelved`, matching `pre-sprint-planning.md`'s existing vocabulary), `Sprint` (a plain single-select
+value like `Sprint 3`, added by hand per sprint — not GitHub's built-in Iteration field, which assumes
+fixed calendar-length cycles this project deliberately doesn't have).
+
+**Views:** `Backlog` (table, filtered to `Status: Backlog`, grouped by Priority — the full unscheduled
+list) and `Current Sprint` (board, grouped by Status — the active sprint's working view). At each
+sprint boundary, update the `Current Sprint` view's filter to the new sprint value.
+
+**Draft items vs. real Issues:** backlog entries start as draft items (cheap, no repo noise). Convert
+to a real repo Issue only once something is pulled into a sprint — real Issues can be referenced from
+commits/PRs (`Closes #12`), giving traceability a draft item can't. This also keeps the Issues tab
+showing only things actually worked, not the full someday/maybe list.
+
+**Initiative / Task hierarchy:** two levels, not three — no separate "Story" tier, no custom field for
+it. An **Initiative** is a big-picture objective (could be sprint-sized or much smaller); a **Task** is
+one concrete, independently-completable unit of work, sized to map to a single subagent delegation.
+Most backlog items are already Task-sized and need nothing else — the Issue *is* the Task. Decompose an
+Initiative into sub-issues (GitHub's native parent/child issue links, not a label) only when it turns
+out to have multiple genuinely separable deliverables — and decide that lazily, at sprint-selection
+time when the real seams are visible, not upfront on every backlog item. Sprint 2 goal 2
+("Correctness & Reliability Cleanup") is a good retroactive example of what should have been a parent
+Issue with sub-issues: four separable deliverables (outbox pattern, `FAILED` transition, SSE-defect
+check, retention policy) bundled under one goal.
+
+**Log unplanned work too**, even retroactively — a board that only reflects planned work quietly
+becomes inaccurate the first time something urgent jumps the queue (see the exception in "Sprint
+workflow" above).
+
+---
+
 ## Agent rules
 
 1. Do not invent product requirements beyond this document unless required for implementation.
