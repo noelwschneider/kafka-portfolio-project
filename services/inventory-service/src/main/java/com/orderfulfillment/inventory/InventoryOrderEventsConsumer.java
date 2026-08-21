@@ -3,18 +3,12 @@ package com.orderfulfillment.inventory;
 import tools.jackson.databind.JsonNode;
 import com.orderfulfillment.common.CorrelationIdHolder;
 import com.orderfulfillment.common.events.EventEnvelope;
-import com.orderfulfillment.common.events.EventItem;
-import com.orderfulfillment.common.events.InventoryReservationFailedPayload;
-import com.orderfulfillment.common.events.InventoryReservedPayload;
 import com.orderfulfillment.common.events.OrderCreatedPayload;
-import com.orderfulfillment.common.events.ShortageItem;
 import com.orderfulfillment.common.idempotency.ProcessedEventKey;
 import com.orderfulfillment.common.idempotency.ProcessedEventLedger;
 import com.orderfulfillment.common.kafka.EventCodec;
-import com.orderfulfillment.common.kafka.EventPublisher;
 import com.orderfulfillment.common.kafka.EventTypes;
 import com.orderfulfillment.common.kafka.KafkaTopics;
-import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +30,11 @@ import org.springframework.stereotype.Component;
  *       skipped record has no side effect to deduplicate, and recording it would fill the ledger
  *       with rows for events this service never acts on.</li>
  * </ul>
+ *
+ * <p><b>Sprint 2:</b> this consumer no longer publishes anything itself. {@link InventoryService}
+ * (by way of {@link InventoryReservationExecutor}) records the outbound InventoryReserved /
+ * InventoryReservationFailed event to {@code outbox_events} inside the same transaction as the
+ * reservation, per ADR-006; {@link OutboxPublisher} sends it to Kafka afterward.
  */
 @Component
 public class InventoryOrderEventsConsumer {
@@ -46,15 +45,12 @@ public class InventoryOrderEventsConsumer {
 
     private final InventoryService inventoryService;
     private final EventCodec eventCodec;
-    private final EventPublisher eventPublisher;
     private final ProcessedEventLedger processedEventLedger;
 
     public InventoryOrderEventsConsumer(InventoryService inventoryService, EventCodec eventCodec,
-                                         EventPublisher eventPublisher,
                                          ProcessedEventLedger processedEventLedger) {
         this.inventoryService = inventoryService;
         this.eventCodec = eventCodec;
-        this.eventPublisher = eventPublisher;
         this.processedEventLedger = processedEventLedger;
     }
 
@@ -84,22 +80,10 @@ public class InventoryOrderEventsConsumer {
         List<OrderLine> lines = payload.items().stream()
                 .map(i -> new OrderLine(i.sku(), i.quantity())).toList();
 
-        ReservationResult result = inventoryService.reserve(orderId, lines, eventKey);
-        if (result.duplicate()) {
-            // A concurrent delivery of the same event won the ledger claim; it publishes the outcome.
-            return;
-        }
-        if (result.success()) {
-            List<EventItem> items = payload.items();
-            InventoryReservedPayload reserved =
-                    new InventoryReservedPayload(orderId, result.reservationId(), items, Instant.now());
-            eventPublisher.publish(KafkaTopics.INVENTORY_EVENTS, EventTypes.INVENTORY_RESERVED, orderId, reserved);
-        } else {
-            List<ShortageItem> shortages = result.shortages().stream()
-                    .map(s -> new ShortageItem(s.sku(), s.requested(), s.available())).toList();
-            InventoryReservationFailedPayload failed =
-                    new InventoryReservationFailedPayload(orderId, result.failureReason(), shortages);
-            eventPublisher.publish(KafkaTopics.INVENTORY_EVENTS, EventTypes.INVENTORY_RESERVATION_FAILED, orderId, failed);
-        }
+        // The reservation (or shortage) outcome and its InventoryReserved/InventoryReservationFailed
+        // outbox row are written atomically inside InventoryService/InventoryReservationExecutor
+        // (ADR-006, Sprint 2) — nothing left to publish here. A DUPLICATE result means a concurrent
+        // delivery of the same event already recorded (and will publish) the outcome.
+        inventoryService.reserve(orderId, lines, eventKey);
     }
 }

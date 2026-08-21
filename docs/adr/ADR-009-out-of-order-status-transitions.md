@@ -148,13 +148,24 @@ implemented:
 
 - **A new table and a new failure mode to look at.** `deferred_transitions` is one more thing to
   inspect when an order looks stuck. It is also the first place that will *say* why — which the
-  previous behavior never did.
-- **A parked transition whose predecessor never arrives waits forever.** If `PaymentAuthorized` is
-  dead-lettered, the order rests at `PAYMENT_PENDING` with a parked `FULFILLED`. That is honest and
-  strictly better than the old outcome (a stranded order with a corrupted history), but it is not
-  self-healing. The general problem — what Order Service should do about an order whose event never
-  resolves — is the same open question `docs/reliability-pattern.md` §5 already flags, and this ADR
-  does not close it. Transition 9 (`→ FAILED`) remains unimplemented.
+  previous behavior never did. Like `processed_events` (ADR-005), it grows without bound if nothing
+  prunes it; Sprint 2 goal 2 added `DeferredTransitionRetentionScheduler`, which purges resolved
+  (`APPLIED`/`ABANDONED`) rows older than 7 days once a day and never touches a `PENDING` row
+  regardless of age — deleting a live parked transition would silently erase it rather than resolve
+  it.
+- **A parked transition whose predecessor never arrives waited forever — until Sprint 2.** If
+  `PaymentAuthorized` was dead-lettered, the order rested at `PAYMENT_PENDING` with a parked
+  `FULFILLED`, indefinitely, because nothing told Order Service the predecessor had failed for good.
+  Transition 9 (`→ FAILED`) closes exactly this: `OrderDeadLetterConsumer` (Sprint 2 goal 2 — see
+  `docs/order-state-machine.md`'s "Implementation, Sprint 2 goal 2" note) listens on this service's
+  own `orders.dlq` and calls `OrderPersistence#markFailed` for the order a dead-lettered record
+  belongs to. `markFailed` re-drains that order's parked transitions after writing `FAILED`, so a
+  `FULFILLED` left waiting on the now-dead-lettered `PaymentAuthorized` is marked `ABANDONED` in the
+  same transaction rather than sitting `PENDING` forever. The general problem this bullet originally
+  named — what Order Service should do about an order whose event never resolves — is answered for
+  the "never resolves because it was dead-lettered" case; an event that is simply never produced at
+  all (no publish, no DLQ record either) is not detectable from inside Order Service and remains the
+  open question `docs/reliability-pattern.md` §5 flags.
 - **A row lock on every transition.** Per order, held for the length of one short transaction. At
   demo volume this is not a throughput concern; at much higher volume it would become the natural
   serialization point to measure.
@@ -193,3 +204,12 @@ implemented:
   — reproduces the race **deterministically** (it publishes `PaymentAuthorized` only after observing
   that the early `ShipmentCreated` has been parked), against real Testcontainers Kafka and Postgres.
   Verified to fail with the original symptoms when the guard is disabled.
+- **Sprint 2 goal 2 — transition 9 (`→ FAILED`):**
+  `.../OrderDeadLetterConsumer.java` (the `orders.dlq` listener) and `OrderPersistence#markFailed`.
+  `services/order-service/src/test/java/com/orderfulfillment/order/OrderFailedTransitionIntegrationTest.java`
+  proves it against a real dead-lettered record.
+- **Sprint 2 goal 2 — `deferred_transitions` retention:** `.../DeferredTransitionRetentionScheduler.java`,
+  `DeferredTransitionRepository#deleteByStatusNotAndResolvedAtBefore`.
+  `services/order-service/src/test/java/com/orderfulfillment/order/RetentionSchedulerIntegrationTest.java`
+  proves both that resolved rows past the window are purged and that a `PENDING` row survives
+  regardless of age.

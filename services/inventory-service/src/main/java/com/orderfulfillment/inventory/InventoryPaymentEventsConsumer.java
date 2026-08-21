@@ -3,17 +3,12 @@ package com.orderfulfillment.inventory;
 import tools.jackson.databind.JsonNode;
 import com.orderfulfillment.common.CorrelationIdHolder;
 import com.orderfulfillment.common.events.EventEnvelope;
-import com.orderfulfillment.common.events.EventItem;
-import com.orderfulfillment.common.events.InventoryReleasedPayload;
 import com.orderfulfillment.common.events.PaymentRejectedPayload;
 import com.orderfulfillment.common.idempotency.ProcessedEventKey;
 import com.orderfulfillment.common.idempotency.ProcessedEventLedger;
 import com.orderfulfillment.common.kafka.EventCodec;
-import com.orderfulfillment.common.kafka.EventPublisher;
 import com.orderfulfillment.common.kafka.EventTypes;
 import com.orderfulfillment.common.kafka.KafkaTopics;
-import java.time.Instant;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -29,6 +24,9 @@ import org.springframework.stereotype.Component;
  * the different {@code consumer_name} ({@code inventory.payment-rejected}): the composite ledger key
  * is what allows this consumer and the OrderCreated one to record the same {@code eventId}
  * independently, which matters because a single {@code processed_events} table serves both.
+ *
+ * <p><b>Sprint 2:</b> this consumer no longer publishes anything itself — see
+ * {@link InventoryOrderEventsConsumer}'s Javadoc; the same ADR-006 outbox change applies here.
  */
 @Component
 public class InventoryPaymentEventsConsumer {
@@ -39,15 +37,12 @@ public class InventoryPaymentEventsConsumer {
 
     private final InventoryService inventoryService;
     private final EventCodec eventCodec;
-    private final EventPublisher eventPublisher;
     private final ProcessedEventLedger processedEventLedger;
 
     public InventoryPaymentEventsConsumer(InventoryService inventoryService, EventCodec eventCodec,
-                                           EventPublisher eventPublisher,
                                            ProcessedEventLedger processedEventLedger) {
         this.inventoryService = inventoryService;
         this.eventCodec = eventCodec;
-        this.eventPublisher = eventPublisher;
         this.processedEventLedger = processedEventLedger;
     }
 
@@ -75,17 +70,9 @@ public class InventoryPaymentEventsConsumer {
         String orderId = payload.orderId();
         log.info("Processing PaymentRejected {} for order {}", envelope.eventId(), orderId);
 
-        ReleaseResult result = inventoryService.release(orderId, eventKey);
-        if (result.duplicate()) {
-            return; // a concurrent delivery of the same event won the ledger claim
-        }
-        if (result.reservationId() == null) {
-            return; // nothing was reserved for this order (should not happen on the real flow) — nothing to publish
-        }
-        List<EventItem> items = result.items().stream()
-                .map(line -> new EventItem(line.sku(), line.quantity())).toList();
-        InventoryReleasedPayload released = new InventoryReleasedPayload(
-                orderId, result.reservationId(), items, "PAYMENT_REJECTED", Instant.now());
-        eventPublisher.publish(KafkaTopics.INVENTORY_EVENTS, EventTypes.INVENTORY_RELEASED, orderId, released);
+        // The release and its InventoryReleased outbox row (when there was anything to release) are
+        // written atomically inside InventoryService/InventoryReservationExecutor (ADR-006,
+        // Sprint 2) — nothing left to publish here.
+        inventoryService.release(orderId, eventKey);
     }
 }

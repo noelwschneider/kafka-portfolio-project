@@ -1,8 +1,10 @@
 # ADR-006: Add a transactional outbox for database/Kafka consistency
 
-- **Status:** Accepted. Frozen in Phase 0; implemented in Phase 6, in Order Service only. Phases
-  1–5 deliberately shipped the simpler publish-after-commit behavior, with the resulting failure
-  window documented rather than hidden; Inventory, Payment and Fulfillment Service still ship it.
+- **Status:** Accepted. Frozen in Phase 0; implemented in Phase 6 for Order Service only. Phases
+  1–5 deliberately shipped the simpler publish-after-commit behavior for the other three services,
+  with the resulting failure window documented rather than hidden. **Sprint 2 closed that gap**:
+  Inventory, Payment and Fulfillment Service each now have their own `outbox_events` table and
+  poller, identical in shape to Order Service's — see the Sprint 2 correction below.
 - **Date:** 2026-08-17 (Phase 0)
 
 ## Context
@@ -60,11 +62,31 @@ publisher whose lost event strands an order that a user has already been told wa
 > crash between such a commit and its publish strands the order just as permanently as a lost
 > `OrderCreated` does — only at a later status. Phase 6 therefore routed **both** of Order Service's
 > publish sites through the outbox (`OrderCreated` from `POST /api/orders`, and `PaymentRequested`
-> from the `InventoryReserved` transition), not just the first. The same reasoning applies to
-> Inventory, Payment and Fulfillment Service, which remain out of scope and therefore still carry a
-> real, non-self-healing dual-write window — see `docs/agent-reports/phase-6-outbox.md` §Judgment
-> calls. What redelivery does still cover is the narrower case of a consumer that crashes *before*
-> committing anything at all.
+> from the `InventoryReserved` transition), not just the first. The same reasoning applied to
+> Inventory, Payment and Fulfillment Service, which were out of Phase 6's scope and therefore
+> carried a real, non-self-healing dual-write window — see `docs/agent-reports/phase-6-outbox.md`
+> §Judgment calls. **Sprint 2 closes that window for all three — see the correction below.** What
+> redelivery does still cover is the narrower case of a consumer that crashes *before* committing
+> anything at all.
+
+> **Correction, Sprint 2 goal 2 (Correctness & Reliability Cleanup).** The gap this ADR originally
+> left open for Inventory, Payment and Fulfillment Service is closed. Each service got its own
+> `outbox_events` table (identical DDL to Order Service's, in its own schema —
+> `docs/db-ownership.md` §2/§3) and its own `OutboxRecorder` / `OutboxDispatcher` / `OutboxPublisher`
+> trio, matching Order Service's conventions:
+>
+> - **Inventory Service** — `InventoryReservationExecutor`'s `REQUIRES_NEW` transactions
+>   (`attemptReserve`, `release`) now record `InventoryReserved`, `InventoryReservationFailed`, and
+>   `InventoryReleased` to the outbox in the same transaction as the reservation/release change and
+>   the `processed_events` claim.
+> - **Payment Service** — `PaymentService#authorize`'s `REQUIRES_NEW` transaction records
+>   `PaymentAuthorized`/`PaymentRejected` alongside the `payment_attempts` row.
+> - **Fulfillment Service** — `FulfillmentService#createShipment`'s `REQUIRES_NEW` transaction
+>   records `ShipmentCreated` alongside the `shipments` row.
+>
+> All four services now publish through the outbox; none of them still carries the dual-write
+> window described above. `docs/CHANGELOG-contracts.md` has the coordination-protocol note for the
+> accompanying `docs/db-ownership.md` change.
 
 ## Alternatives considered
 
@@ -141,6 +163,8 @@ implementation pinned down something the prose left open (full detail in
   column whose `FAILED` rows need someone to look at them.
 - Ordering: rows must be published in insertion order per aggregate to preserve the per-partition
   ordering ADR-001 relies on.
-- Asymmetry becomes a documentation obligation. After Phase 6, Order Service publishes durably and the
-  other three do not; the architecture page must say which is which rather than implying the whole
-  system is covered.
+- Asymmetry was a documentation obligation between Phase 6 and Sprint 2: Order Service published
+  durably and the other three did not, and the architecture page had to say which was which rather
+  than implying the whole system was covered. Sprint 2 closed the asymmetry (see the correction
+  above); the architecture page now says all four publish through the outbox, with no per-service
+  caveat left to state.

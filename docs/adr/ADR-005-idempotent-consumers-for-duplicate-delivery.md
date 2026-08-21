@@ -88,9 +88,12 @@ which is exactly when duplicates arrive, and with multiple replicas each pod wou
 
 **Accepted costs.**
 
-- One extra read and one extra insert per event, and a table that grows monotonically. A retention
-  policy (delete rows older than N days) is needed eventually; at demo volume it is not urgent, and
-  pruning is safe once records are past Kafka's own retention.
+- One extra read and one extra insert per event, and a table that grows monotonically.
+  **Sprint 2 goal 2 added the retention policy this bullet called for**: `ProcessedEventRetentionScheduler`
+  (`services/common/src/main/java/com/orderfulfillment/common/idempotency/`) runs once a day in
+  every service that has a `processed_events` table and deletes rows older than 7 days — chosen to
+  match Kafka's own default topic retention (`log.retention.hours=168`), which is exactly the "past
+  Kafka's own retention" safety margin this bullet already named.
 - The ledger row and the business change must share a transaction. That constrains handler structure —
   no side effect may escape the transaction boundary — and it is the reason the ledger cannot be
   shared across services.

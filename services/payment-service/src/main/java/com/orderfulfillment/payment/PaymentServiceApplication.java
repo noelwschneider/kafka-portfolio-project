@@ -5,6 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.TypeExcludeFilter;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Payment Service — Phase 3 extraction from the Phase 1/2 monolith. Runs standalone on port 8083
@@ -21,6 +22,7 @@ import org.springframework.context.annotation.FilterType;
  * context of tests that did not ask for them (docs/agent-reports/phase-4-pattern-design.md §4.1).
  */
 @SpringBootApplication
+@EnableScheduling // Sprint 2: drives OutboxPublisher's poll of outbox_events (ADR-006).
 @ComponentScan(
         basePackages = {"com.orderfulfillment.payment", "com.orderfulfillment.common"},
         excludeFilters = @ComponentScan.Filter(type = FilterType.CUSTOM, classes = TypeExcludeFilter.class))

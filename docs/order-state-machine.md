@@ -125,6 +125,15 @@ consumer's error handling. This is the one state in this document whose entry co
 supplied rather than formalized, and it is reported as such in
 `docs/agent-reports/phase-0.md`.
 
+**Implementation, Sprint 2 goal 2.** ADR-009's "Accepted costs" section originally left this
+transition unimplemented alongside the guard/defer mechanism it shipped. It is implemented now:
+`OrderDeadLetterConsumer` listens on this service's own `orders.dlq` — the terminal sink every one
+of Order Service's three domain-topic listeners already routes a record to once retries are
+exhausted or the failure is non-retryable — and calls `OrderPersistence#markFailed` for the
+dead-lettered record's order. The transition table's own guard (nothing leaves a terminal state,
+§4/ADR-009) makes a redelivered dead-letter record a safe no-op, so this needs no separate
+idempotency ledger entry.
+
 ---
 
 ## 4. Consistency checks

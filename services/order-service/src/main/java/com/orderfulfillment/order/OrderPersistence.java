@@ -10,6 +10,7 @@ import com.orderfulfillment.common.kafka.EventTypes;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -133,6 +134,63 @@ class OrderPersistence {
             case STALE -> {
                 logStale(order, status, sourceEventId);
                 yield StatusTransitionResult.asStale();
+            }
+        };
+    }
+
+    /**
+     * Transition 9 (docs/order-state-machine.md) — {@link OrderDeadLetterConsumer} calls this for
+     * every record it observes on this service's own {@code orders.dlq}: a non-retryable processing
+     * failure, or retries exhausted, for one of this order's inbound events
+     * (InventoryReserved/InventoryReservationFailed, PaymentAuthorized/PaymentRejected,
+     * ShipmentCreated). Order Service can no longer trust its own view of that order's progress once
+     * one of those events could not be applied, so the order moves to the fault terminal state
+     * rather than being silently left at whatever status it last reached.
+     *
+     * <p>No {@code processed_events} claim here (unlike every other transition above): a dead-letter
+     * record has no reliable {@code eventId} to key one on — the poison-bytes case that is the most
+     * common reason a record reaches the DLQ is exactly the case where the envelope may not parse at
+     * all. Idempotency instead comes from {@link OrderTransitions#classify}'s own guard: once the
+     * order is FAILED (or has reached any other terminal state), a redelivered or duplicate
+     * dead-letter record for the same order classifies as {@code STALE} and writes nothing — the same
+     * mechanism ADR-009 already relies on for out-of-order domain events.
+     *
+     * <p>Tolerates an order that does not exist (an orderId that never became a real order, or one
+     * this service has no record of) by logging and doing nothing, rather than throwing — a listener
+     * on this service's own terminal failure sink must never itself fail loudly.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    StatusTransitionResult markFailed(String orderId) {
+        Optional<OrderEntity> maybeOrder = orderRepository.findByIdForUpdate(orderId);
+        if (maybeOrder.isEmpty()) {
+            log.warn("Cannot apply the FAILED transition for order {}: no such order exists. The "
+                    + "dead-lettered record's aggregateId did not correspond to an order this service "
+                    + "created.", orderId);
+            return StatusTransitionResult.asStale();
+        }
+        OrderEntity order = maybeOrder.get();
+        return switch (OrderTransitions.classify(order.getStatus(), OrderStatus.FAILED)) {
+            case APPLY -> {
+                writeStatus(order, OrderStatus.FAILED, null);
+                // FAILED is terminal, so any transition still parked for this order (e.g. a
+                // FULFILLED waiting on the very PaymentAuthorized that just got dead-lettered) can
+                // never apply — drain now so it is marked ABANDONED instead of sitting PENDING
+                // forever with nothing left to ever re-offer it (ADR-009).
+                drainDeferred(order);
+                yield StatusTransitionResult.asApplied();
+            }
+            case STALE -> {
+                logStale(order, OrderStatus.FAILED, null);
+                yield StatusTransitionResult.asStale();
+            }
+            // Unreachable: FAILED's predecessor set (OrderTransitions.VALID_PREDECESSORS) is "any
+            // non-terminal status", so classify() always resolves APPLY or STALE for this target —
+            // never AHEAD, which only arises for a target with a narrower predecessor set than the
+            // order's current progress. Handled anyway so this switch stays exhaustive and safe.
+            case AHEAD -> {
+                log.error("Unexpected AHEAD verdict marking order {} FAILED from {} — this should be "
+                        + "unreachable; leaving the order untouched", orderId, order.getStatus());
+                yield StatusTransitionResult.asDeferred();
             }
         };
     }

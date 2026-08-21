@@ -33,6 +33,19 @@ orderfulfillment:
     # — processed_events is per-service, never shared, because the dedup insert must commit in the
     # same local transaction as the business change). Created by V2__processed_events.sql.
     processed-events-table: fulfillment_service.processed_events
+  outbox:
+    # Sprint 2's transactional outbox (ADR-006), extended to Fulfillment Service. Same defaults as
+    # Order Service's copy — see that service's application.yml for the full rationale of each value.
+    poll-interval-ms: 50
+    batch-size: 100
+    send-timeout-ms: 10000
+    fail-after-ms: 300000
+  retention:
+    # Sprint 2: purges old processed_events rows, flagged as growing without bound in ADR-005.
+    # 7 days matches Kafka's own default topic retention (log.retention.hours=168) — see
+    # order-service/src/main/resources/application.yml for the full rationale.
+    processed-events-days: 7
+    check-interval-ms: 86400000
 
 app:
   cors:

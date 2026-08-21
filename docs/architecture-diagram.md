@@ -36,9 +36,9 @@ flowchart TB
 
     subgraph pg["PostgreSQL — one schema per service"]
         S_ORD["order_service<br/>orders, order_items,<br/>order_status_history,<br/>outbox_events, deferred_transitions,<br/>processed_events"]
-        S_INV["inventory_service<br/>inventory_items,<br/>inventory_reservations,<br/>processed_events"]
-        S_PAY["payment_service<br/>payment_attempts,<br/>processed_events"]
-        S_FUL["fulfillment_service<br/>shipments,<br/>processed_events"]
+        S_INV["inventory_service<br/>inventory_items,<br/>inventory_reservations,<br/>outbox_events, processed_events"]
+        S_PAY["payment_service<br/>payment_attempts,<br/>outbox_events, processed_events"]
+        S_FUL["fulfillment_service<br/>shipments,<br/>outbox_events, processed_events"]
         S_SCN["scenario_service<br/>scenario_runs,<br/>scenario_run_timeline"]
     end
 
@@ -244,13 +244,12 @@ Stated plainly so no diagram above is read as promising more than the implementa
   relative order. Nothing guarantees ordering across orders.
 - **Eventual consistency across services.** An order can be `PAID` for a few milliseconds before a
   shipment exists. Every read is a snapshot of one service's view.
-- **A dual-write window still exists in three of the four services.** Inventory, Payment and
-  Fulfillment Service persist and then publish, so a crash in between loses the event. Order Service
-  closed this in Phase 6 (ADR-006): both events it produces — `OrderCreated` and `PaymentRequested` —
-  are written to an `outbox_events` row in the same transaction as the business change, and a
-  background publisher sends them and marks them published. That makes Order Service's publication
-  durable, not exactly-once: a crash between the send and the mark resends the row, which the
-  idempotent consumers above absorb.
+- **No dual-write window remains in any of the four services.** Order Service closed this first, in
+  Phase 6 (ADR-006); Sprint 2 closed it in Inventory, Payment and Fulfillment Service too. Every
+  event each service produces is written to that service's own `outbox_events` row in the same
+  transaction as the business change it describes, and a background publisher per service sends the
+  row and marks it published. That makes publication durable, not exactly-once: a crash between the
+  send and the mark resends the row, which the idempotent consumers above absorb.
 - **Order Service's own aggregate status is guarded against cross-topic reordering (ADR-009).**
   `PaymentAuthorized` (`payments.events`) and `ShipmentCreated` (`fulfillment.events`) are consumed
   by Order Service on independent listeners with no ordering guarantee between the two topics, and

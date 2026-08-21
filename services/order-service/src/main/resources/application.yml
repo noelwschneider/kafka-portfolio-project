@@ -51,6 +51,14 @@ orderfulfillment:
     # cannot be published within 5 minutes of being written is marked FAILED (and logged at ERROR)
     # rather than retried forever, so a permanently unpublishable row cannot block the queue.
     fail-after-ms: 300000
+  retention:
+    # Sprint 2: purges old processed_events rows and resolved (APPLIED/ABANDONED) deferred_transitions
+    # rows, both flagged as growing without bound in ADR-005/ADR-009. 7 days matches Kafka's own
+    # default topic retention (log.retention.hours=168) — a row is never purged while its event could
+    # still be redelivered. Once a day is frequent enough for housekeeping that isn't latency-sensitive.
+    processed-events-days: 7
+    deferred-transitions-days: 7
+    check-interval-ms: 86400000
 
 app:
   cors:

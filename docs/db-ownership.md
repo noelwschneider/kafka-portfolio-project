@@ -29,22 +29,25 @@ queries, separate migration timelines) without running four database containers 
 | `orders` | Order Service | Order header and lifecycle status |
 | `order_items` | Order Service | Order lines |
 | `order_status_history` | Order Service | One row per state transition, for the order timeline |
-| `outbox_events` | Order Service | Transactional outbox (Phase 6) |
+| `outbox_events` (`order_service` schema) | Order Service | Transactional outbox (Phase 6) |
 | `deferred_transitions` | Order Service | Status transitions consumed before their predecessor arrived, awaiting application (ADR-009) |
 | `processed_events` (`order_service` schema) | Order Service | Idempotency ledger for its own consumers |
 | `inventory_items` | Inventory Service | Per-SKU stock |
 | `inventory_reservations` | Inventory Service | Per-order reservations |
 | `processed_events` (`inventory_service` schema) | Inventory Service | Idempotency ledger for its own consumers |
+| `outbox_events` (`inventory_service` schema) | Inventory Service | Transactional outbox (Sprint 2) |
 | `payment_attempts` | Payment Service | Simulated authorization attempts |
 | `processed_events` (`payment_service` schema) | Payment Service | Idempotency ledger for its own consumers |
+| `outbox_events` (`payment_service` schema) | Payment Service | Transactional outbox (Sprint 2) |
 | `shipments` | Fulfillment Service | Shipment records |
 | `processed_events` (`fulfillment_service` schema) | Fulfillment Service | Idempotency ledger for its own consumers |
+| `outbox_events` (`fulfillment_service` schema) | Fulfillment Service | Transactional outbox (Sprint 2) |
 | `scenario_runs` | Scenario Service | One row per scenario run |
 | `scenario_run_timeline` | Scenario Service | Timeline entries for a run |
 | `events` | Scenario Service | Cross-service event projection backing the Event Explorer (Phase 5 addition — see §4's "Event Explorer's backing store has no owner yet") |
 
-16 rows, 5 owners, no table owned twice. `processed_events` is deliberately listed once per owning
-schema — see §2.
+19 rows, 5 owners, no table owned twice. `processed_events` and `outbox_events` are each
+deliberately listed once per owning schema — see §2.
 
 ---
 
@@ -74,10 +77,14 @@ The composite key is what makes the same event processable by several *different
 being processed at most once by each. Within a single service, two distinct consumers therefore
 coexist in one table without colliding.
 
-`outbox_events` exists only in Order Service, per `docs/planning/sprint-1/implementation-phases.md`'s Phase 6
-("at least the most important publisher, likely Order Service"). Other services keep publishing
-after commit; the resulting dual-write window is documented in
-`docs/adr/ADR-006-transactional-outbox-for-db-kafka-consistency.md`.
+`outbox_events` originally existed only in Order Service, per
+`docs/planning/sprint-1/implementation-phases.md`'s Phase 6 ("at least the most important publisher,
+likely Order Service"), with the other three services documented as still publishing after commit.
+**Sprint 2 closed that gap:** Inventory, Payment and Fulfillment Service each got their own
+`outbox_events` copy, identical in shape to Order Service's, with their own poller. All four
+services now publish through the outbox. See
+`docs/adr/ADR-006-transactional-outbox-for-db-kafka-consistency.md` for the full history and
+`docs/CHANGELOG-contracts.md` for the coordination-protocol note on this change.
 
 ---
 
@@ -173,6 +180,17 @@ status          text NOT NULL            -- RESERVED | RELEASED | FAILED
 created_at      timestamptz NOT NULL
 updated_at      timestamptz NOT NULL
 UNIQUE (order_id, sku)
+
+outbox_events                        -- Sprint 2, mirrors Order Service's (§2)
+-------------
+id              bigserial PK
+aggregate_id    text NOT NULL
+event_type      text NOT NULL
+payload         jsonb NOT NULL       -- full envelope
+created_at      timestamptz NOT NULL
+published_at    timestamptz NULL
+status          text NOT NULL        -- PENDING | PUBLISHED | FAILED
+INDEX (status, created_at)
 ```
 
 `CHECK (reserved_quantity <= available_quantity)` **states Scenario 7's invariant directly**, rather
@@ -204,6 +222,17 @@ amount          numeric(10,2) NOT NULL
 failure_reason  text NULL                -- CARD_DECLINED | INSUFFICIENT_FUNDS
 created_at      timestamptz NOT NULL
 updated_at      timestamptz NOT NULL
+
+outbox_events                        -- Sprint 2, mirrors Order Service's (§2)
+-------------
+id              bigserial PK
+aggregate_id    text NOT NULL
+event_type      text NOT NULL
+payload         jsonb NOT NULL
+created_at      timestamptz NOT NULL
+published_at    timestamptz NULL
+status          text NOT NULL        -- PENDING | PUBLISHED | FAILED
+INDEX (status, created_at)
 ```
 
 `idempotency_key UNIQUE` is a second, independent guard against double authorization: even if the
@@ -221,6 +250,17 @@ status          text NOT NULL            -- CREATED
 tracking_number text NOT NULL
 created_at      timestamptz NOT NULL
 updated_at      timestamptz NOT NULL
+
+outbox_events                        -- Sprint 2, mirrors Order Service's (§2)
+-------------
+id              bigserial PK
+aggregate_id    text NOT NULL
+event_type      text NOT NULL
+payload         jsonb NOT NULL
+created_at      timestamptz NOT NULL
+published_at    timestamptz NULL
+status          text NOT NULL        -- PENDING | PUBLISHED | FAILED
+INDEX (status, created_at)
 ```
 
 `status` has exactly one value in v1, since `OrderShipped` was excluded

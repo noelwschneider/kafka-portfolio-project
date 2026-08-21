@@ -4,14 +4,11 @@ import tools.jackson.databind.JsonNode;
 import com.orderfulfillment.common.CorrelationIdHolder;
 import com.orderfulfillment.common.events.EventEnvelope;
 import com.orderfulfillment.common.events.PaymentAuthorizedPayload;
-import com.orderfulfillment.common.events.ShipmentCreatedPayload;
 import com.orderfulfillment.common.idempotency.ProcessedEventKey;
 import com.orderfulfillment.common.idempotency.ProcessedEventLedger;
 import com.orderfulfillment.common.kafka.EventCodec;
-import com.orderfulfillment.common.kafka.EventPublisher;
 import com.orderfulfillment.common.kafka.EventTypes;
 import com.orderfulfillment.common.kafka.KafkaTopics;
-import com.orderfulfillment.fulfillment.dto.ShipmentDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -29,6 +26,10 @@ import org.springframework.stereotype.Component;
  * matters is the claim inside {@link FulfillmentService#createShipment}'s own transaction, one layer
  * down, because that is the only place it can commit atomically with the side effect. Events this
  * consumer has no use for (PaymentRejected) are skipped before the ledger is touched.
+ *
+ * <p><b>Sprint 2:</b> this consumer no longer publishes anything itself. {@link FulfillmentService}
+ * records the outbound ShipmentCreated event to {@code outbox_events} inside the same transaction
+ * as the {@code shipments} row, per ADR-006; {@link OutboxPublisher} sends it to Kafka afterward.
  */
 @Component
 public class FulfillmentPaymentEventsConsumer {
@@ -39,15 +40,12 @@ public class FulfillmentPaymentEventsConsumer {
 
     private final FulfillmentService fulfillmentService;
     private final EventCodec eventCodec;
-    private final EventPublisher eventPublisher;
     private final ProcessedEventLedger processedEventLedger;
 
     public FulfillmentPaymentEventsConsumer(FulfillmentService fulfillmentService, EventCodec eventCodec,
-                                             EventPublisher eventPublisher,
                                              ProcessedEventLedger processedEventLedger) {
         this.fulfillmentService = fulfillmentService;
         this.eventCodec = eventCodec;
-        this.eventPublisher = eventPublisher;
         this.processedEventLedger = processedEventLedger;
     }
 
@@ -75,14 +73,9 @@ public class FulfillmentPaymentEventsConsumer {
         String orderId = payload.orderId();
         log.info("Processing PaymentAuthorized {} for order {}", envelope.eventId(), orderId);
 
-        ShipmentCreationResult result = fulfillmentService.createShipment(orderId, eventKey);
-        if (result.duplicate()) {
-            // A concurrent delivery of the same event won the ledger claim; it publishes the outcome.
-            return;
-        }
-        ShipmentDto shipment = result.shipment();
-        ShipmentCreatedPayload created = new ShipmentCreatedPayload(
-                orderId, shipment.id(), shipment.trackingNumber(), shipment.createdAt());
-        eventPublisher.publish(KafkaTopics.FULFILLMENT_EVENTS, EventTypes.SHIPMENT_CREATED, orderId, created);
+        // The shipment and its ShipmentCreated outbox row are written atomically inside
+        // FulfillmentService (ADR-006, Sprint 2) — nothing left to publish here. A DUPLICATE result
+        // means a concurrent delivery of the same event already recorded (and will publish) it.
+        fulfillmentService.createShipment(orderId, eventKey);
     }
 }

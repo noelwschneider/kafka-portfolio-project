@@ -27,9 +27,11 @@ class PaymentServiceTest {
         behaviorStore = new PaymentBehaviorStore();
         IdGenerator idGenerator = mock(IdGenerator.class);
         when(idGenerator.nextPaymentId()).thenAnswer(invocation -> "pay-" + UUID.randomUUID());
-        // These unit tests exercise the no-event-key overload, which never touches the ledger.
+        // These unit tests exercise the no-event-key overload, which never touches the ledger and
+        // never records to the outbox (Sprint 2's OutboxRecorder call is also eventKey-gated).
         ProcessedEventLedger processedEventLedger = mock(ProcessedEventLedger.class);
-        paymentService = new PaymentService(repository, behaviorStore, idGenerator, processedEventLedger);
+        OutboxRecorder outboxRecorder = mock(OutboxRecorder.class);
+        paymentService = new PaymentService(repository, behaviorStore, idGenerator, processedEventLedger, outboxRecorder);
     }
 
     @Test

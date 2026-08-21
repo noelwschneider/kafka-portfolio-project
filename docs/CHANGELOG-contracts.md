@@ -13,6 +13,94 @@ Newest first. Each entry states what changed, why, who is affected, and what the
 
 ---
 
+## 2026-08-21 — `adr/ADR-005`, `adr/ADR-009`, `reliability-pattern.md`: retention added for `processed_events` and `deferred_transitions`
+
+**Changed by:** Sprint 2 goal 2, item 4 (Correctness & Reliability Cleanup).
+
+**What changed.** ADR-005's "Accepted costs" bullet and `reliability-pattern.md` §2.4 point 4 both
+said a `processed_events` retention policy was "needed eventually" — it now exists.
+`ProcessedEventRetentionScheduler` (new, in `services/common`) purges rows older than 7 days once a
+day, active in every service that sets `orderfulfillment.reliability.processed-events-table` (Order,
+Inventory, Payment, Fulfillment — not Scenario Service, which has no such table).
+`DeferredTransitionRetentionScheduler` (new, Order Service only) does the same for resolved
+(`APPLIED`/`ABANDONED`) `deferred_transitions` rows, documented as a similarly-unbounded table in
+ADR-009's "Accepted costs" section; a `PENDING` row is never purged by age. No schema change — both
+purge existing columns (`processed_at`, `resolved_at`) that were already there.
+
+**Why.** Both tables grow monotonically by design (idempotency ledger, out-of-order-transition park)
+with no existing cleanup, and both ADRs flagged it as future work rather than closing it. 7 days was
+chosen to match Kafka's own default topic retention (`log.retention.hours=168`) — a ledger row (or a
+resolved deferred-transition row, which exists only because its event was already durably applied or
+abandoned) can never legitimately be needed once its originating event could no longer be
+redelivered from Kafka.
+
+**Who is affected.**
+
+- **Order, Inventory, Payment, Fulfillment Service** — implemented. New `orderfulfillment.retention.*`
+  properties (`processed-events-days`, `deferred-transitions-days` [order-service only],
+  `check-interval-ms`), all with sensible defaults — no config change required to pick this up.
+- **Everyone else** — no action. No table, column, event, or API shape changed.
+
+---
+
+## 2026-08-21 — `order-state-machine.md`, `adr/ADR-009`: transition 9 (→ FAILED) implemented
+
+**Changed by:** Sprint 2 goal 2, item 2 (Correctness & Reliability Cleanup).
+
+**What changed.** `docs/order-state-machine.md`'s transition 9 section gets an "Implementation,
+Sprint 2 goal 2" note pointing at the concrete mechanism; ADR-009's "Accepted costs" bullet that
+named this gap is updated to say it is closed. No transition-table shape changed — transition 9's
+predecessor set ("any non-terminal state") was already frozen and already encoded in
+`OrderTransitions`; what was missing was any caller that ever requested it.
+
+**Why.** ADR-009's own "Accepted costs" section flagged this as the known remaining gap: a
+dead-lettered event left its order stuck at whatever status it last reached, with no record that
+anything had failed. Sprint 2's pre-sprint planning picked it up as one of the "open gaps" worth
+closing.
+
+**Who is affected.**
+
+- **Order Service** — implemented: `OrderDeadLetterConsumer` (new, listens on this service's own
+  `orders.dlq`) and `OrderPersistence#markFailed`. No new event, topic, or API shape — `FAILED` was
+  already in the frozen state list and `GET /api/orders/{id}` already reports whatever status is
+  current; this only adds a real path that can reach it. `markFailed` also re-drains the order's
+  `deferred_transitions` after writing FAILED, so a transition parked behind the now-dead-lettered
+  event is marked `ABANDONED` instead of sitting `PENDING` forever.
+- **Everyone else** — no action. No payload, topic, or schema changed.
+- **Anyone building a DLQ-inspector UI or alerting on `orders.dlq` volume** — a dead-lettered record
+  now has an observable, honest side effect (the order's status) rather than a silent one; nothing
+  about the DLQ record's own shape changed.
+
+---
+
+## 2026-08-21 — `db-ownership.md`, `adr/ADR-006`, `architecture-diagram.md`: outbox extended to Inventory, Payment, Fulfillment Service
+
+**Changed by:** Sprint 2 goal 2, item 1 (Correctness & Reliability Cleanup).
+
+**What changed.** `outbox_events` is no longer Order-Service-only. Inventory, Payment and
+Fulfillment Service each got their own `outbox_events` table — identical DDL to Order Service's, in
+their own schema — plus their own `OutboxRecorder` / `OutboxDispatcher` / `OutboxPublisher` trio.
+`docs/db-ownership.md` §1/§2/§3 now lists three additional `outbox_events` rows (one per schema) and
+says all four services publish through the outbox; ADR-006's status line and Consequences section
+carry a correction recording the change; `docs/architecture-diagram.md` §1's schema boxes and §5's
+delivery-properties bullet no longer describe a three-service dual-write gap.
+
+**Why.** ADR-006 always treated the gap for these three services as a known, documented limitation
+rather than a permanent one — Sprint 2's pre-sprint planning flagged it as one of the "open gaps"
+worth closing. No new event types, no new topics, no payload changes: this closes the same
+publish-after-commit failure window Order Service already closed in Phase 6, using the same pattern.
+
+**Who is affected.**
+
+- **Inventory, Payment, Fulfillment Service** — implemented. New Flyway migrations
+  (`V6__outbox_events.sql` for Inventory, `V4__outbox_events.sql` for Payment and Fulfillment).
+  `InventoryReservationExecutor`, `PaymentService#authorize`, and `FulfillmentService#createShipment`
+  now record their outbound event to the outbox inside the same transaction as the business change;
+  their Kafka consumers no longer call `EventPublisher.publish` directly.
+- **Everyone else** — no action. No event payload, topic, or API shape changed; consumers of
+  `inventory.events` / `payments.events` / `fulfillment.events` see the same wire format as before,
+  just with a stronger durability guarantee behind it.
+
 ## 2026-08-20 — `openapi/inventory-service.yaml`: new `POST /demo/inventory/{sku}/restore`
 
 **Changed by:** fix for the reset defect found live in

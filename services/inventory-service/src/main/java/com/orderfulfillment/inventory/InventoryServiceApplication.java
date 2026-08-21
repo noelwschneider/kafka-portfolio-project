@@ -5,6 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.TypeExcludeFilter;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Inventory Service — Phase 3 extraction from the Phase 1/2 monolith. Runs standalone on port 8082
@@ -23,6 +24,7 @@ import org.springframework.context.annotation.FilterType;
  * context and shows up in, for instance, {@code GET /demo/consumers}.
  */
 @SpringBootApplication
+@EnableScheduling // Sprint 2: drives OutboxPublisher's poll of outbox_events (ADR-006).
 @ComponentScan(
         basePackages = {"com.orderfulfillment.inventory", "com.orderfulfillment.common"},
         excludeFilters = @ComponentScan.Filter(type = FilterType.CUSTOM, classes = TypeExcludeFilter.class))

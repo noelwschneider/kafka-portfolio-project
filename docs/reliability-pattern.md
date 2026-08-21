@@ -140,8 +140,9 @@ that actually committed.
    looked up under another does not deduplicate. Inventory Service keeps both its names in
    `InventoryConsumers`.
 4. **Do not delete ledger rows** while the event could still be redelivered. Pruning is safe only
-   once records are past Kafka's retention; at demo volume no retention policy is needed yet
-   (ADR-005 "Accepted costs").
+   once records are past Kafka's retention. Sprint 2 goal 2 added exactly that:
+   `ProcessedEventRetentionScheduler` purges rows older than 7 days (Kafka's own default topic
+   retention), once a day, in every service that has this table (ADR-005 "Accepted costs").
 
 ---
 
@@ -334,8 +335,8 @@ Say these out loud rather than letting them be assumed away:
   fetched, deserialized and looked up.
 - **A handler with a side effect outside its transaction is not protected.** That is why §2's rule
   is a rule.
-- **The ledger grows monotonically.** A retention policy is needed eventually; it is not urgent at
-  demo volume.
+- **The ledger grows monotonically — was true until Sprint 2.** §2.4 point 4 has the current state:
+  a daily retention purge now runs in every service that owns a `processed_events` table.
 - **Ordering between topics is not covered, and retry is not the tool for it.** Idempotency makes a
   duplicate harmless; it says nothing about two *different* events for the same aggregate arriving in
   the wrong order off two different topics. That is a real failure mode in this system — see

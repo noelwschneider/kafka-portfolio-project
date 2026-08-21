@@ -1,8 +1,14 @@
 package com.orderfulfillment.inventory;
 
 import com.orderfulfillment.common.IdGenerator;
+import com.orderfulfillment.common.events.EventItem;
+import com.orderfulfillment.common.events.InventoryReleasedPayload;
+import com.orderfulfillment.common.events.InventoryReservationFailedPayload;
+import com.orderfulfillment.common.events.InventoryReservedPayload;
+import com.orderfulfillment.common.events.ShortageItem;
 import com.orderfulfillment.common.idempotency.ProcessedEventKey;
 import com.orderfulfillment.common.idempotency.ProcessedEventLedger;
+import com.orderfulfillment.common.kafka.EventTypes;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -24,6 +30,12 @@ import org.springframework.transaction.annotation.Transactional;
  * that commits separately from the reservation it is supposed to be atomic with. Claiming it inside
  * also makes the retry loop behave correctly for free: an attempt that loses the optimistic-lock
  * race rolls back its ledger row along with everything else, so the next attempt starts clean.
+ *
+ * <p><b>Sprint 2:</b> the same reasoning now applies to the outbound event. Every publish site here
+ * goes through {@link OutboxRecorder} instead of {@code EventPublisher.publish}, so the reservation
+ * (or release) change and the {@code outbox_events} row commit in this same transaction — closing
+ * the dual-write gap ADR-006 originally left open for this service. The consumers no longer publish
+ * anything themselves; {@link OutboxPublisher} does, on its own schedule, from what committed here.
  */
 @Component
 class InventoryReservationExecutor {
@@ -32,15 +44,18 @@ class InventoryReservationExecutor {
     private final InventoryReservationRepository reservationRepository;
     private final IdGenerator idGenerator;
     private final ProcessedEventLedger processedEventLedger;
+    private final OutboxRecorder outboxRecorder;
 
     InventoryReservationExecutor(InventoryItemRepository itemRepository,
                                   InventoryReservationRepository reservationRepository,
                                   IdGenerator idGenerator,
-                                  ProcessedEventLedger processedEventLedger) {
+                                  ProcessedEventLedger processedEventLedger,
+                                  OutboxRecorder outboxRecorder) {
         this.itemRepository = itemRepository;
         this.reservationRepository = reservationRepository;
         this.idGenerator = idGenerator;
         this.processedEventLedger = processedEventLedger;
+        this.outboxRecorder = outboxRecorder;
     }
 
     /**
@@ -88,6 +103,12 @@ class InventoryReservationExecutor {
 
         if (!shortages.isEmpty()) {
             String reason = anyUnknownSku ? "UNKNOWN_SKU" : "INSUFFICIENT_STOCK";
+            if (eventKey != null) {
+                List<ShortageItem> shortageItems = shortages.stream()
+                        .map(s -> new ShortageItem(s.sku(), s.requested(), s.available())).toList();
+                outboxRecorder.record(EventTypes.INVENTORY_RESERVATION_FAILED, orderId,
+                        new InventoryReservationFailedPayload(orderId, reason, shortageItems));
+            }
             return ReservationResult.failed(reason, shortages);
         }
 
@@ -101,6 +122,14 @@ class InventoryReservationExecutor {
             item.setUpdatedAt(now);
             reservationRepository.save(new InventoryReservationEntity(
                     reservationId + "-" + sku, orderId, sku, quantity, ReservationStatus.RESERVED, now));
+        }
+        if (eventKey != null) {
+            // The event's items reflect the actual reservation (summed per SKU), not the raw
+            // possibly-duplicate-SKU order lines — consistent with what was actually written above.
+            List<EventItem> items = requested.entrySet().stream()
+                    .map(e -> new EventItem(e.getKey(), e.getValue())).toList();
+            outboxRecorder.record(EventTypes.INVENTORY_RESERVED, orderId,
+                    new InventoryReservedPayload(orderId, reservationId, items, now));
         }
         return ReservationResult.reserved(reservationId);
     }
@@ -132,6 +161,12 @@ class InventoryReservationExecutor {
             if (reservationGroupId == null && reservation.getId().endsWith(suffix)) {
                 reservationGroupId = reservation.getId().substring(0, reservation.getId().length() - suffix.length());
             }
+        }
+        if (eventKey != null) {
+            List<EventItem> items = released.stream()
+                    .map(line -> new EventItem(line.sku(), line.quantity())).toList();
+            outboxRecorder.record(EventTypes.INVENTORY_RELEASED, orderId,
+                    new InventoryReleasedPayload(orderId, reservationGroupId, items, "PAYMENT_REJECTED", now));
         }
         return new ReleaseResult(reservationGroupId, released);
     }

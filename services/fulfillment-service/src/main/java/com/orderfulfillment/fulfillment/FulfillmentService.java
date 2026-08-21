@@ -2,8 +2,10 @@ package com.orderfulfillment.fulfillment;
 
 import com.orderfulfillment.common.IdGenerator;
 import com.orderfulfillment.common.NotFoundException;
+import com.orderfulfillment.common.events.ShipmentCreatedPayload;
 import com.orderfulfillment.common.idempotency.ProcessedEventKey;
 import com.orderfulfillment.common.idempotency.ProcessedEventLedger;
+import com.orderfulfillment.common.kafka.EventTypes;
 import com.orderfulfillment.fulfillment.dto.ShipmentDto;
 import java.time.Instant;
 import org.springframework.stereotype.Service;
@@ -13,6 +15,11 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Runs in-process this phase, standing in for Fulfillment Service consuming PaymentAuthorized
  * (docs/events/event-catalog.md). No carrier integration; tracking numbers are generated locally.
+ *
+ * <p><b>Sprint 2:</b> {@link #createShipment} now also records the outbound ShipmentCreated event
+ * to {@code outbox_events} in the same transaction as the {@code shipments} row (ADR-006), closing
+ * the dual-write gap this service previously carried. {@link FulfillmentPaymentEventsConsumer} no
+ * longer publishes anything itself; {@link OutboxPublisher} does.
  */
 @Service
 public class FulfillmentService {
@@ -20,12 +27,14 @@ public class FulfillmentService {
     private final ShipmentRepository repository;
     private final IdGenerator idGenerator;
     private final ProcessedEventLedger processedEventLedger;
+    private final OutboxRecorder outboxRecorder;
 
     public FulfillmentService(ShipmentRepository repository, IdGenerator idGenerator,
-                               ProcessedEventLedger processedEventLedger) {
+                               ProcessedEventLedger processedEventLedger, OutboxRecorder outboxRecorder) {
         this.repository = repository;
         this.idGenerator = idGenerator;
         this.processedEventLedger = processedEventLedger;
+        this.outboxRecorder = outboxRecorder;
     }
 
     /**
@@ -51,6 +60,8 @@ public class FulfillmentService {
         String trackingNumber = "TRK-" + String.format("%09d", Math.abs(shipmentId.hashCode()) % 1_000_000_000);
         ShipmentEntity shipment = new ShipmentEntity(shipmentId, orderId, "CREATED", trackingNumber, Instant.now());
         repository.save(shipment);
+        outboxRecorder.record(EventTypes.SHIPMENT_CREATED, orderId,
+                new ShipmentCreatedPayload(orderId, shipmentId, trackingNumber, shipment.getCreatedAt()));
         return ShipmentCreationResult.created(toDto(shipment));
     }
 

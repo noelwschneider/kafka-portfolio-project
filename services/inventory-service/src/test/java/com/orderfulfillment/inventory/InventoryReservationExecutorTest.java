@@ -30,12 +30,17 @@ class InventoryReservationExecutorTest {
      * real database by {@link InventoryDuplicateEventIntegrationTest}. */
     @Mock
     private ProcessedEventLedger processedEventLedger;
+    /** Never consulted here either, for the same reason: a null event key means nothing is recorded
+     * to the outbox (see InventoryReservationExecutor's Sprint 2 outbox calls). */
+    @Mock
+    private OutboxRecorder outboxRecorder;
 
     private InventoryReservationExecutor executor;
 
     @BeforeEach
     void setUp() {
-        executor = new InventoryReservationExecutor(itemRepository, reservationRepository, idGenerator, processedEventLedger);
+        executor = new InventoryReservationExecutor(
+                itemRepository, reservationRepository, idGenerator, processedEventLedger, outboxRecorder);
     }
 
     @Test

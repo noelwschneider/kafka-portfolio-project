@@ -36,6 +36,18 @@ final class OrderConsumers {
     static final String PAYMENT_EVENTS_CONSUMER = "order.payment-events";
     static final String FULFILLMENT_EVENTS_CONSUMER = "order.fulfillment-events";
 
+    /**
+     * Sprint 2 goal 2, item 2 (docs/order-state-machine.md transition 9): {@link
+     * OrderDeadLetterConsumer}'s listener on this service's own {@code orders.dlq}. A distinct
+     * consumer group from {@code "order-service"} (the group every domain-topic listener above
+     * shares) — this listener does not compete for partitions or offsets with the domain consumers,
+     * and dead-lettering is not idempotency-ledger-tracked (the FAILED transition's own guard in
+     * {@code OrderTransitions} — nothing leaves a terminal state — is what makes a redelivered
+     * dead-letter record a safe no-op).
+     */
+    static final String DEAD_LETTER_LISTENER_ID = "orders-dlq";
+    static final String DEAD_LETTER_GROUP_ID = "order-service-dlq";
+
     private OrderConsumers() {
     }
 }

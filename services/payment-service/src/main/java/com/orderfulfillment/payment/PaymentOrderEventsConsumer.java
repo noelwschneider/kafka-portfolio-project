@@ -3,16 +3,12 @@ package com.orderfulfillment.payment;
 import tools.jackson.databind.JsonNode;
 import com.orderfulfillment.common.CorrelationIdHolder;
 import com.orderfulfillment.common.events.EventEnvelope;
-import com.orderfulfillment.common.events.PaymentAuthorizedPayload;
-import com.orderfulfillment.common.events.PaymentRejectedPayload;
 import com.orderfulfillment.common.events.PaymentRequestedPayload;
 import com.orderfulfillment.common.idempotency.ProcessedEventKey;
 import com.orderfulfillment.common.idempotency.ProcessedEventLedger;
 import com.orderfulfillment.common.kafka.EventCodec;
-import com.orderfulfillment.common.kafka.EventPublisher;
 import com.orderfulfillment.common.kafka.EventTypes;
 import com.orderfulfillment.common.kafka.KafkaTopics;
-import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -29,6 +25,11 @@ import org.springframework.stereotype.Component;
  * layer down, because that is the only place it can commit atomically with the
  * {@code payment_attempts} row it guards. Events this consumer has no use for (OrderCreated, also
  * carried on {@code orders.events}) are skipped before the ledger is touched.
+ *
+ * <p><b>Sprint 2:</b> this consumer no longer publishes anything itself. {@link PaymentService}
+ * records the outbound PaymentAuthorized/PaymentRejected event to {@code outbox_events} inside the
+ * same transaction as the {@code payment_attempts} row, per ADR-006; {@link OutboxPublisher} sends
+ * it to Kafka afterward.
  */
 @Component
 public class PaymentOrderEventsConsumer {
@@ -39,15 +40,12 @@ public class PaymentOrderEventsConsumer {
 
     private final PaymentService paymentService;
     private final EventCodec eventCodec;
-    private final EventPublisher eventPublisher;
     private final ProcessedEventLedger processedEventLedger;
 
     public PaymentOrderEventsConsumer(PaymentService paymentService, EventCodec eventCodec,
-                                       EventPublisher eventPublisher,
                                        ProcessedEventLedger processedEventLedger) {
         this.paymentService = paymentService;
         this.eventCodec = eventCodec;
-        this.eventPublisher = eventPublisher;
         this.processedEventLedger = processedEventLedger;
     }
 
@@ -75,24 +73,14 @@ public class PaymentOrderEventsConsumer {
         String orderId = payload.orderId();
         log.info("Processing PaymentRequested {} for order {}", envelope.eventId(), orderId);
 
+        // AUTHORIZED/REJECTED outcomes and their outbox row are written atomically inside
+        // PaymentService (ADR-006, Sprint 2) — nothing left to publish here. PROVIDER_ERROR still
+        // throws to drive the consumer error handler's retry/DLQ path; DUPLICATE means a concurrent
+        // delivery of the same event already recorded (and will publish) the outcome.
         PaymentOutcome outcome =
                 paymentService.authorize(orderId, payload.amount(), payload.idempotencyKey(), eventKey);
-        switch (outcome.kind()) {
-            case AUTHORIZED -> {
-                PaymentAuthorizedPayload authorized = new PaymentAuthorizedPayload(
-                        orderId, outcome.paymentAttemptId(), payload.amount(), Instant.now());
-                eventPublisher.publish(KafkaTopics.PAYMENTS_EVENTS, EventTypes.PAYMENT_AUTHORIZED, orderId, authorized);
-            }
-            case REJECTED -> {
-                PaymentRejectedPayload rejected = new PaymentRejectedPayload(orderId, outcome.paymentAttemptId(),
-                        payload.amount(), outcome.failureReason().name(), Instant.now());
-                eventPublisher.publish(KafkaTopics.PAYMENTS_EVENTS, EventTypes.PAYMENT_REJECTED, orderId, rejected);
-            }
-            case PROVIDER_ERROR -> throw new PaymentProviderException(orderId, outcome.paymentAttemptId());
-            case DUPLICATE -> {
-                // A concurrent delivery of the same event won the ledger claim; it publishes the
-                // outcome. Nothing to do here.
-            }
+        if (outcome.kind() == PaymentOutcome.Kind.PROVIDER_ERROR) {
+            throw new PaymentProviderException(orderId, outcome.paymentAttemptId());
         }
     }
 }
