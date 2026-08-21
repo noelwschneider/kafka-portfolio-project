@@ -64,8 +64,8 @@ publisher whose lost event strands an order that a user has already been told wa
 > publish sites through the outbox (`OrderCreated` from `POST /api/orders`, and `PaymentRequested`
 > from the `InventoryReserved` transition), not just the first. The same reasoning applied to
 > Inventory, Payment and Fulfillment Service, which were out of Phase 6's scope and therefore
-> carried a real, non-self-healing dual-write window — see `docs/agent-reports/phase-6-outbox.md`
-> §Judgment calls. **Sprint 2 closes that window for all three — see the correction below.** What
+> carried a real, non-self-healing dual-write window. **Sprint 2 closes that window for all
+> three — see the correction below.** What
 > redelivery does still cover is the narrower case of a consumer that crashes *before* committing
 > anything at all.
 
@@ -124,8 +124,7 @@ cannot preserve publication order.
 ## Consequences and tradeoffs
 
 **As built (Phase 6).** The list below was written in Phase 0 and held up; these are the points where
-implementation pinned down something the prose left open (full detail in
-`docs/agent-reports/phase-6-outbox.md`):
+implementation pinned down something the prose left open:
 
 - Both Order Service publish sites go through the outbox, for the reason in the Decision correction
   above. `OrderCreated` is recorded by `OrderPersistence#createPendingOrder`, `PaymentRequested` by

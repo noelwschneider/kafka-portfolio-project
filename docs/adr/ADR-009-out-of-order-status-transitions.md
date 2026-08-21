@@ -13,8 +13,8 @@ between topics. Until this ADR, `OrderPersistence` wrote whatever status its cal
 reading the order row only to mutate it. The transition table of `docs/order-state-machine.md` §3
 existed as prose and as documentation comments; no code consulted it.
 
-That is not merely theoretically unsound. It produced a live, reproducible correctness failure,
-documented in `docs/agent-reports/phase-10-scaling-demo.md` §4.
+That is not merely theoretically unsound. It produced a live, reproducible correctness failure
+during the Phase 10 scaling demo.
 
 `PaymentAuthorized` is the project's one deliberate fan-out event (`docs/events/event-catalog.md`
 §3): Order Service and Fulfillment Service consume it independently, in separate consumer groups,

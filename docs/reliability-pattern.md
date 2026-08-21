@@ -267,8 +267,8 @@ as the happy path.
 
 ## 5. Gap 1 — retry exhaustion now has a defined destination
 
-`docs/agent-reports/phase-3-inventory-concurrency.md` §7.1 left this open:
-`InventoryReservationFailed.reason` is frozen to `INSUFFICIENT_STOCK | UNKNOWN_SKU`, and neither is
+This was left open: `InventoryReservationFailed.reason` is frozen to
+`INSUFFICIENT_STOCK | UNKNOWN_SKU`, and neither is
 true when a reservation loses 25 optimistic-lock races in a row. Before Phase 4, that exception
 escaped the listener, the default error handler logged it and seeked past, and the order was
 stranded in `PENDING` forever.

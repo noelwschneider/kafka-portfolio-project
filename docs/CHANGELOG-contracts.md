@@ -103,8 +103,7 @@ publish-after-commit failure window Order Service already closed in Phase 6, usi
 
 ## 2026-08-20 — `openapi/inventory-service.yaml`: new `POST /demo/inventory/{sku}/restore`
 
-**Changed by:** fix for the reset defect found live in
-`docs/agent-reports/sprint-2/deployment-execution-report.md` §6.
+**Changed by:** fix for the reset defect found live during deployment verification.
 
 **What changed.** A new `/demo` path, `POST /demo/inventory/{sku}/restore`, with a new
 `RestoreInventoryRequest` schema (`{availableQuantity}`). It sets `availableQuantity` to the given
@@ -133,8 +132,7 @@ Service's reset an atomic way to clear both fields together.
 
 ## 2026-08-20 — new `docs/adr/ADR-009` + `db-ownership.md`: `deferred_transitions` table (Order Service status race fix)
 
-**Changed by:** post-Phase-10 correctness fix for the defect found live in
-`docs/agent-reports/phase-10-scaling-demo.md` §4.
+**Changed by:** post-Phase-10 correctness fix for the defect found live during the scaling demo.
 
 **What changed.**
 
@@ -174,7 +172,7 @@ partition for what is not a failure.
 
 ## 2026-08-18 — `db-ownership.md` + `openapi/scenario-service.yaml`: new `events` table and `GET /demo/events` (Event Explorer)
 
-**Changed by:** Phase 5, Scenario Service build (`docs/agent-reports/phase-5-scenario-service.md`).
+**Changed by:** Phase 5, Scenario Service build.
 
 **What changed.**
 
@@ -211,7 +209,7 @@ minimal rather than fabricating a consumption phase.
 
 ## 2026-08-18 — `db-ownership.md`: `inventory_items` gains `CHECK (reserved_quantity <= available_quantity)`
 
-**Changed by:** Phase 4 pattern-design step (`docs/agent-reports/phase-4-pattern-design.md`).
+**Changed by:** Phase 4 pattern-design step.
 
 **What changed.** The Inventory Service table definition in `docs/db-ownership.md` §3 now carries a
 third CHECK constraint relating the two quantity columns, alongside the existing
@@ -220,11 +218,10 @@ third CHECK constraint relating the two quantity columns, alongside the existing
 
 **Why.** The project's headline invariant — "total reserved inventory never exceeds available
 inventory" (`docs/scenarios.md`, Scenario 7) — was enforced only in application code. The two
-existing per-column checks do not imply it, and
-`docs/agent-reports/phase-3-inventory-concurrency.md` §4 found a real bug that wrote
-`reserved_quantity = 4` against `available_quantity = 2`, which the database accepted. §7.2 of that
-report recommended this constraint and flagged it rather than making the change, because it touches
-a frozen contract. This is that change, made through the coordination protocol.
+existing per-column checks do not imply it, and a real bug was found that wrote
+`reserved_quantity = 4` against `available_quantity = 2`, which the database accepted. This
+constraint was recommended and flagged rather than made immediately, because it touches a frozen
+contract. This is that change, made through the coordination protocol.
 
 Optimistic locking on `version` remains the primary mechanism; this is the backstop that converts a
 future oversell from silent stock corruption into a loud, immediate constraint violation.

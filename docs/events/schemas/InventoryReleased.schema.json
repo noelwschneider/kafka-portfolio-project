@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://order-fulfillment-lab.example/events/InventoryReleased.schema.json",
   "title": "InventoryReleased payload",
-  "description": "docs/events/event-catalog.md §3 — InventoryReleased. Published by Inventory Service on inventory.events; no consumer in v1. This schema covers only the envelope's `payload` field, not the envelope itself. Added alongside the 7 schemas the Phase 2 prompt named explicitly, for completeness against the full 8-event catalog — see docs/agent-reports/phase-2.md.",
+  "description": "docs/events/event-catalog.md §3 — InventoryReleased. Published by Inventory Service on inventory.events; no consumer in v1. This schema covers only the envelope's `payload` field, not the envelope itself. Added alongside the 7 schemas the Phase 2 prompt named explicitly, for completeness against the full 8-event catalog.",
   "type": "object",
   "additionalProperties": true,
   "required": ["orderId", "reservationId", "items", "reason", "releasedAt"],

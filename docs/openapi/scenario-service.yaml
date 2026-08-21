@@ -375,8 +375,7 @@ paths:
         "Event Explorer's backing store has no owner yet": Scenario Service already consumes all four
         domain topics (plus their DLQs) to build scenario-run timelines, so it owns this
         general-purpose projection too, backed by the `events` table added in the same change. See
-        `docs/agent-reports/phase-5-scenario-service.md` and `docs/CHANGELOG-contracts.md`'s Phase 5
-        entry.
+        `docs/CHANGELOG-contracts.md`'s Phase 5 entry.
 
         Every filter is optional and they combine with AND. Only fields the projection can genuinely
         observe from consuming the record are returned — see `EventRecord`'s own note.

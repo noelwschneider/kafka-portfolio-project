@@ -98,4 +98,4 @@ everything it refers to is covered above):
 > multi-service Kafka/Kubernetes portfolio project somewhere shareable. Don't provision anything or
 > create any accounts yet — start by walking me through the realistic platform options and their
 > actual current pricing, so we can decide together before you touch anything. Write your findings
-> to a markdown file in `docs/agent-reports/sprint-2`.
+> to a markdown file.

@@ -36,8 +36,7 @@ both in circulation:
   terminal state.
 
 **`REJECTED_OUT_OF_STOCK` is the frozen value.** It matches two of the three references, including
-the one the UI and the Scenario 2 integration test assert against. The planning docs were not edited;
-this is reported in `docs/agent-reports/phase-0.md`.
+the one the UI and the Scenario 2 integration test assert against. The planning docs were not edited.
 
 ---
 
@@ -122,8 +121,7 @@ into it at all. It is formalized here as the fault outcome — reachable from an
 when one of the order's events cannot be processed (Scenario 6's poison message being the
 demonstrable case). No domain event in `docs/events/event-catalog.md` causes it; it is driven by the
 consumer's error handling. This is the one state in this document whose entry condition Phase 0
-supplied rather than formalized, and it is reported as such in
-`docs/agent-reports/phase-0.md`.
+supplied rather than formalized.
 
 **Implementation, Sprint 2 goal 2.** ADR-009's "Accepted costs" section originally left this
 transition unimplemented alongside the guard/defer mechanism it shipped. It is implemented now:

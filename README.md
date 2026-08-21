@@ -9,14 +9,13 @@ generally for the design docs behind everything in this repo.
 
 ## Live demo
 
-A hosted instance is on the way: the repo-side work is done, but the server it runs on is being
-provisioned separately, so **there is no public URL yet**. The link will land here once it exists.
+**https://fulfillment-demo.noelschneider.com**
 
-When it does, know what you are clicking: it is a **shared public sandbox**. Anyone can run the
-failure scenarios, several people can be running them at once, and the system resets itself after a
-period of inactivity — so inventory levels, orders and scenario runs may change or disappear while
-you are looking at them. That is the demo working as intended, not a bug. Everything below runs the
-same system locally, where the only person changing state is you.
+Know what you are clicking: it is a **shared public sandbox**. Anyone can run the failure scenarios,
+several people can be running them at once, and the system resets itself after a period of
+inactivity — so inventory levels, orders and scenario runs may change or disappear while you are
+looking at them. That is the demo working as intended, not a bug. Everything below runs the same
+system locally, where the only person changing state is you.
 
 ## Prerequisites
 
@@ -142,9 +141,7 @@ Kafka is configured with two listeners so both workflows above work against the 
 
 (That's why a single `PLAINTEXT://localhost:9092` listener, the pre-Phase-7 config, stopped working
 once services moved into separate containers: `localhost` inside a container resolves to that
-container itself, not the broker. Deeper rationale lives in this author's local, gitignored
-`docs/agent-reports/phase-7-containerization.md` working notes — not tracked in git, so it won't be
-present in a fresh clone.)
+container itself, not the broker.)
 
 ## Run the whole stack in Kubernetes (local `kind`)
 
@@ -222,9 +219,7 @@ all, so readiness can't reflect a Kafka outage directly. The backend ConfigMaps 
 `MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE=readinessState,db` — a manifest-level property
 override, no application source touched — so readiness at least reflects the Postgres dependency,
 and a Postgres outage (rather than a Kafka one) is what actually demonstrates the
-readiness-vs-liveness distinction live. Deeper manifest inventory and resource-sizing notes live in
-this author's local, gitignored `docs/agent-reports/phase-8-kubernetes.md` — not tracked in git, so
-it won't be present in a fresh clone.
+readiness-vs-liveness distinction live.
 
 Manual horizontal scaling of a backend service (rather than the frontend or one-off jobs) is worth
 trying directly against the running consumer groups:
@@ -235,8 +230,11 @@ kubectl scale deployment/inventory-service --replicas=2 -n orderfulfillment
 
 then trigger Scenario 8 (High-Volume Batch, `POST /demo/scenarios/high-volume`) and watch consumer
 lag on `inventory-service`'s `orders.events` group change as replica count changes — this is the
-mechanism behind Kafka consumer-group parallelism, not a simulation. No `HorizontalPodAutoscaler` is
-configured; scaling here is manual (`kubectl scale`), which is enough to demonstrate the mechanism.
+mechanism behind Kafka consumer-group parallelism, not a simulation. A `HorizontalPodAutoscaler`
+(`infrastructure/kubernetes/10-inventory-service-hpa.yaml`, fed by `metrics-server`) also scales
+Inventory Service automatically between 1 and 3 replicas on CPU utilization — see
+`docs/architecture-diagram.md`'s Scaling section for a real, measured scale-up/scale-down run. Manual
+`kubectl scale` remains useful for triggering a specific replica count on demand.
 On this project's own development machine, only 1 and 2 Inventory Service replicas were actually
 measured — a 3rd replica hit a local Docker Desktop VM resource ceiling (CPU/memory contention
 across the whole cluster's pods, not a defect in the manifests or the scaling mechanism itself) and
@@ -268,9 +266,10 @@ rule 18 — no claim here is stronger than what's actually built):
   across all five services (ADR-008) to make asynchronous failures diagnosable rather than silent.
 - Designed concurrent inventory reservation logic, backed by integration tests, that prevents
   overselling under competing concurrent order requests.
-- Implemented a transactional outbox in Order Service (ADR-006) to close the database/Kafka
-  dual-write gap for that service's own event publication — durable, not exactly-once; the same gap
-  is documented, not hidden, as still open in the other three services.
+- Implemented a transactional outbox (ADR-006) to close the database/Kafka dual-write gap for every
+  publisher's own event publication — durable, not exactly-once. Shipped for Order Service first,
+  then extended to Inventory, Payment, and Fulfillment Service, so all four business services now
+  publish through the same pattern with no remaining dual-write window.
 - Found and fixed a real out-of-order-delivery correctness bug (ADR-009): two independently-consumed
   Kafka topics writing the same order's status could interleave and corrupt its state under load.
   Fixed with an explicit state-transition guard, a deferred-transition queue, and per-order
@@ -280,11 +279,14 @@ rule 18 — no claim here is stronger than what's actually built):
   each service's actual dependencies. Demonstrated manual horizontal scaling of a Kafka consumer
   group (`kubectl scale`) with real, measured throughput and consumer-lag numbers at 1 and 2
   replicas — no `HorizontalPodAutoscaler` is configured, so "scalable" here means the manifests and
-  consumer-group mechanics support it, demonstrated manually, not that autoscaling is implemented.
+  consumer-group mechanics support it, demonstrated both manually and via a `HorizontalPodAutoscaler`
+  on Inventory Service.
 - Built an interactive engineering console (React/TypeScript) that triggers these scenarios as real
   HTTP requests against the running services and visualizes actual resulting state, Kafka events,
   and SSE-pushed status changes — not a frontend animation (rule 10).
 
-Not yet built, stated plainly rather than left implicit: CI/CD (no GitHub Actions workflow exists in
-this repo despite being an originally pinned-stack goal), and a `HorizontalPodAutoscaler` for
-automatic (as opposed to manual) scaling.
+Not yet built, stated plainly rather than left implicit: full CI/CD. A GitHub Actions workflow
+(`.github/workflows/build-images.yml`) exists, but it only builds and publishes the six container
+images to GHCR on manual `workflow_dispatch` — there is no workflow that runs tests on push/PR, and
+deployment to the public demo stays a manual `kubectl apply` rather than something the pipeline does
+(`docs/adr/ADR-010-k3s-on-a-dedicated-hetzner-vps-for-the-public-demo.md`).

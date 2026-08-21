@@ -22,10 +22,9 @@
    [`vps-agent-briefing.md`](vps-agent-briefing.md).
 4. **Deployment Spike** — get the application running somewhere a link can be shared. The platform
    and sizing decisions are made (see "Deployment decision" below). Of the code-changes work
-   (`docs/agent-reports/sprint-2/deployment-code-changes-briefing.md`, W1–W8, plus the newer T1–T4
-   tuning items), **W2–W5 and W7 are already done**; **W1, W6, W8, and T1–T4 remain**, all now
-   unblocked since the platform question is settled. **Actual provisioning and deploy** continues in
-   the same deployment agent session that made the platform decision.
+   (W1–W8, plus the newer T1–T4 tuning items), **W2–W5 and W7 are already done**; **W1, W6, W8, and
+   T1–T4 remain**, all now unblocked since the platform question is settled. **Actual provisioning
+   and deploy** continues in the same deployment agent session that made the platform decision.
 5. ~~**README Demo Walkthrough**~~ — **deferred out of this sprint.** A recording is only worth doing
    against a frontend that looks finished, and any accompanying copy belongs with a broader content
    pass rather than a one-off addition. Split into two future sprints instead: a **frontend polish
@@ -36,13 +35,12 @@
 7. **Bug Hunt** — a time-boxed pass (half a day to a day) focused on concurrency and partial-failure
    paths, the two categories that have produced real bugs so far (per ADR-009 and the SSE defect).
    Starting item already flagged: unmapped paths return 500 instead of 404, found during deployment
-   verification (`docs/agent-reports/sprint-2/deployment-execution-report.md`, item 4).
+   verification.
 
 ## Deployment decision
 
 The deployment agent session settled the platform question, then revised the box sizes against what
-Hetzner actually had in stock (full reasoning in `docs/agent-reports/sprint-2/deployment-platform-options.md`,
-`deployment-platform-revision.md`, and `dev-vs-demo-host-separation.md`):
+Hetzner actually had in stock:
 
 - **One Hetzner CX23 (2 vCPU / 4GB, ~€5.99/month) running k3s**, applying the existing
   `infrastructure/kubernetes/` manifests unchanged — not managed Kubernetes, not a PaaS. The
@@ -120,22 +118,12 @@ definition of done.
   rather than proceeding unilaterally, since this goal carries recurring cost and long-term platform
   implications.
 - **A deployment ADR is now ready to write** — the platform decision has landed (see "Deployment
-  decision" above), and `deployment-platform-options.md` §7–8 already has the reasoning and rejected
-  alternatives in ADR shape. Write it as part of the code-changes work rather than speculatively.
-  Possibly one more ADR for the `FAILED`-transition/retention-policy design within `open gaps`. Follow
-  the existing `docs/adr/` numbering.
-- **A deployment reference doc** (likely `docs/deployment.md`, alongside `docs/architecture-diagram.md`
-  and the other frozen contracts) — how to actually deploy this thing, written once `provision + deploy`
-  completes. `deployment-code-changes-briefing.md`'s W8 already lists which existing docs need updating
-  alongside it.
-- **Deployment agent reports already exist**, under `docs/agent-reports/sprint-2/`:
-  `deployment-platform-options.md` (original platform comparison and pricing), `deployment-platform-revision.md`
-  (the CX23/CPX32 sizing revision and the new T1–T4 tuning work), `dev-vs-demo-host-separation.md`
-  (why goal 3 and goal 4 use separate servers), `deployment-code-changes-briefing.md` (W1–W8, the
-  standalone briefing for the code-changes work — T1–T4 belong with the same code agent per the
-  revision doc), `deployment-code-changes-w2-w5.md` (W2–W5 already complete), and
-  `security-hygiene-pass.md` (W7 already complete — the security pass picked it up, so it does not
-  need doing again as part of the remaining W1/W6/W8/T1–T4 work).
+  decision" above), and the platform-options reasoning and rejected alternatives are already in ADR
+  shape. Write it as part of the code-changes work rather than speculatively. Possibly one more ADR
+  for the `FAILED`-transition/retention-policy design within `open gaps`. Follow the existing
+  `docs/adr/` numbering.
+- **W2–W5 and W7 of the deployment code-changes work are already complete** — W7 was picked up by
+  the security pass, so it does not need doing again as part of the remaining W1/W6/W8/T1–T4 work.
 
 No Sprint-2 equivalent of `sprint-1/backend-design.md`, `frontend-design.md`, or
 `high-level-design.md` is needed — none of these seven goals redesign the system.

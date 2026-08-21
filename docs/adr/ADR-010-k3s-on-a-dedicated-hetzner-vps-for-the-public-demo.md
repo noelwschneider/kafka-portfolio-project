@@ -23,18 +23,14 @@ The requirements that shaped the choice:
 - It must not be the same machine as Sprint 2's dev VPS. That box exists to be crashed — chaos
   testing, crash loops, multi-replica load tests. The demo box exists to be boring.
 
-The full option comparison is in `docs/agent-reports/sprint-2/deployment-platform-options.md`; the
-sizing revision, against what Hetzner could actually sell in August 2026, is in
-`deployment-platform-revision.md`.
-
 ### The sizing question, answered with the project's own measurements
 
 The instinct was a 4 vCPU / 8 GB box. Only the 2 vCPU / 4 GB CX23 was orderable — Hetzner's
 cost-optimized lines were capacity-constrained, and the lines that stayed in stock (CPX, CCX) had
 been re-priced 2.2–2.7× in June 2026, putting them 3–8× over budget.
 
-This did not need to be estimated, because `docs/agent-reports/sprint-1/phase-10-scaling-demo.md`
-had already measured this exact stack under a harder cap than a CX23 imposes:
+This did not need to be estimated, because the Phase 10 scaling demo had already measured this
+exact stack under a harder cap than a CX23 imposes:
 
 - The development machine's Docker Desktop VM is limited to **3.825 GiB — less memory than a CX23
   has** — and inside that limit the full 8-pod stack at 1 replica each (Postgres, Kafka, five

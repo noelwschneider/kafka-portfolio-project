@@ -19,9 +19,8 @@ task mostly won't touch application code, so the rest of `docs/planning/` isn't 
 The project's local dev environment (an M1 MacBook, 8GB RAM, Docker Desktop capped at ~3.8GB VM) has
 a proven, hard ceiling: a `kind` Kubernetes cluster running this project's full stack at 3 replicas
 per service (9 pods) causes genuine CPU/memory contention — Kafka readiness probes flap, pods
-crash-loop. This isn't a bug to fix; it's confirmed hardware headroom, documented in
-`docs/agent-reports/sprint-1/phase-10-scaling-demo.md`. Two Sprint 2 goals need to test past that
-ceiling:
+crash-loop. This isn't a bug to fix; it's confirmed hardware headroom, documented during the
+Phase 10 scaling demo. Two Sprint 2 goals need to test past that ceiling:
 
 - An **autoscaler** demo needs to actually watch pods scale up under load — which is exactly the
   scenario that hits the wall locally.
@@ -39,14 +38,12 @@ time — which is why the target spec below is smaller than an early draft of th
   box is provisioned per session and deleted when not in use, not run as a persistent server. Pursue
   Hetzner unless setup surfaces a real problem with the platform; if so, CPX42 (8 vCPU / 16GB) is the
   same-provider fallback. Oracle Cloud's free tier is out of scope for this task.
-- `docs/agent-reports/sprint-2/dev-vs-demo-host-separation.md` — confirms and explains why this box is
-  deliberately separate from Sprint 2 goal 4's production demo box (a different Hetzner server, plan
-  CX23, always-on, ~€5.99/month). This box's job is to run deliberately-induced chaos, crash loops,
-  and multi-replica load at will; the demo box's job is to stay up and boring for a stranger clicking
-  a link. Don't conflate them in any doc or script this task produces.
-- `docs/agent-reports/sprint-2/deployment-platform-revision.md` — the sizing and cost analysis behind
-  both boxes' current specs, including why hourly billing changes what "the deliverable" means for
-  this task (see below).
+- This box is deliberately separate from Sprint 2 goal 4's production demo box (a different Hetzner
+  server, plan CX23, always-on, ~€5.99/month). This box's job is to run deliberately-induced chaos,
+  crash loops, and multi-replica load at will; the demo box's job is to stay up and boring for a
+  stranger clicking a link. Don't conflate them in any doc or script this task produces. The sizing
+  and cost analysis behind both boxes' current specs, including why hourly billing changes what "the
+  deliverable" means for this task, is covered below.
 
 ## Goal
 

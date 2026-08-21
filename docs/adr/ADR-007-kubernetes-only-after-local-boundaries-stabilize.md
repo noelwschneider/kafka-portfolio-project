@@ -34,8 +34,11 @@ Kubernetes lands in Phase 8, after service boundaries are stable (Phase 3), reli
 - **Phase 8:** Deployments, Services, ConfigMaps, Secrets, readiness/liveness probes, and resource
   requests/limits — targeting local `kind` (`docs/planning/sprint-1/execution-plan.md` §7, chosen over Minikube
   for reproducibility in GitHub Actions).
-- **Deferred past Phase 8:** HorizontalPodAutoscaler (Phase 10, with the scaling demonstration),
-  PodDisruptionBudget, NetworkPolicy, and service mesh — the last being an explicit non-goal.
+- **Deferred past Phase 8:** HorizontalPodAutoscaler (planned for Phase 10 alongside the scaling
+  demonstration; Phase 10 itself shipped only the manual `kubectl scale` story, and the
+  `HorizontalPodAutoscaler` followed later, as Sprint 2 goal 6 — see
+  `docs/architecture-diagram.md`'s Scaling section), PodDisruptionBudget, NetworkPolicy, and service
+  mesh — the last being an explicit non-goal.
 - **The local path stays supported permanently.** Kubernetes never becomes the only way to run this
   project.
 

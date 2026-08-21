@@ -267,8 +267,8 @@ Stated plainly so no diagram above is read as promising more than the implementa
 
 ## 6. Scaling
 
-`docs/agent-reports/sprint-1/phase-10-scaling-demo.md` first showed this system's horizontal-scaling
-story by hand: `kubectl scale deployment/inventory-service --replicas=N` against Scenario 8
+This system's horizontal-scaling story was first shown by hand:
+`kubectl scale deployment/inventory-service --replicas=N` against Scenario 8
 ("High-Volume Batch," `docs/scenarios.md`), and measured its limits — the local `kind` Docker
 Desktop VM's ~3.8GB ceiling meant 3 replicas of Inventory Service alongside the rest of the 8-pod
 stack pushed the node into CPU/memory contention and Kafka readiness-probe flapping before any
@@ -294,5 +294,4 @@ laptop's Docker Desktop VM) running Scenario 8 against a live `kind` cluster —
 burst's submitted orders started draining, the HPA rescaled Inventory Service from 1 to 2 replicas
 (`SuccessfulRescale ... New size: 2; reason: cpu resource utilization (percentage of request) above
 target`), and once the backlog drained and utilization stayed low past the stabilization window it
-scaled back down to 1 (`SuccessfulRescale ... New size: 1; reason: All metrics below target`). Full
-transcript and analysis in `docs/agent-reports/sprint-2/hpa-scaling-demo.md`.
+scaled back down to 1 (`SuccessfulRescale ... New size: 1; reason: All metrics below target`).

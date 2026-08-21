@@ -196,8 +196,7 @@ INDEX (status, created_at)
 `CHECK (reserved_quantity <= available_quantity)` **states Scenario 7's invariant directly**, rather
 than leaving the two per-column checks to imply it — added in Phase 4 because a real application-level
 bug wrote `reserved_quantity = 4` against `available_quantity = 2` and the database accepted it
-(`docs/agent-reports/phase-3-inventory-concurrency.md` §4, §7.2; migration `V3__reserved_within_available.sql`;
-broadcast in `docs/CHANGELOG-contracts.md`).
+(migration `V3__reserved_within_available.sql`; broadcast in `docs/CHANGELOG-contracts.md`).
 
 `available_quantity >= 0` as a database CHECK is deliberate: it is the last line of defence for
 Scenario 7's invariant ("total reserved inventory never exceeds available inventory") if the
@@ -296,7 +295,7 @@ UNIQUE (run_id, sequence)
 **Phase 0 addition.** `docs/planning/sprint-1/backend-design.md`'s data model defines no scenario tables, but
 its own `GET /demo/scenario-runs/{runId}` endpoint and `docs/planning/sprint-1/frontend-design.md`'s Scenario
 Run Detail page require stored runs with timelines. These two tables are the minimum that supports
-them; reported in `docs/agent-reports/phase-0.md`.
+them.
 
 `detail` is `jsonb` and nullable on purpose. `docs/planning/sprint-1/frontend-design.md` says "Do not
 fabricate these fields. Display only values actually available from the system" — so partition,
@@ -324,9 +323,8 @@ UNIQUE (topic, partition, offset)
 ```
 
 **Phase 5 addition**, made through the coordination protocol — resolves this section's own
-"Event Explorer's backing store has no owner yet" note below. Full rationale, the query endpoint this
-backs, and the honesty tradeoffs made are in `docs/agent-reports/phase-5-scenario-service.md`; the
-one-line summary: Scenario Service already has to consume all four domain topics to build honest
+"Event Explorer's backing store has no owner yet" note below. The one-line summary: Scenario
+Service already has to consume all four domain topics to build honest
 scenario-run timelines, so it is the natural single owner of the general-purpose event projection too,
 rather than standing up a second consumer of the same four topics. `UNIQUE (topic, partition, offset)`
 — not `event_id` alone — because a DLQ record and the domain record it was dead-lettered from
@@ -362,8 +360,7 @@ This does mean `display_name` lives in Inventory Service while `unit_price` live
 product data split across two owners. That is the honest cost of the decision, and it is acceptable
 here only because `docs/planning/project-overview.md` §3 rules out a real catalog: there is no
 product service to own product data, and inventing one to hold four rows would add a service purely
-to satisfy tidiness. Prices are demo constants, not business data. Reported as a judgment call in
-`docs/agent-reports/phase-0.md`.
+to satisfy tidiness. Prices are demo constants, not business data.
 
 There is no currency column anywhere; the project uses a single implicit currency.
 
@@ -377,9 +374,8 @@ events that belong to a scenario run.
 
 ~~Deferred, not resolved.~~ **Resolved by Phase 5**, once the decisions this was waiting on were
 actually made: Scenario Service consumes all four domain topics (plus their DLQs) to build honest
-scenario-run timelines, so it is the projection's owner — see §3's `events` table above and
-`docs/agent-reports/phase-5-scenario-service.md`. The query endpoint is `GET /demo/events`
-(`docs/openapi/scenario-service.yaml`).
+scenario-run timelines, so it is the projection's owner — see §3's `events` table above. The query
+endpoint is `GET /demo/events` (`docs/openapi/scenario-service.yaml`).
 
 ### Cross-schema references
 
