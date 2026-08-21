@@ -36,12 +36,24 @@ the system as it was planned pre-implementation, not a living spec. Prefer the f
 | [`sprint-1/implementation-phases.md`](sprint-1/implementation-phases.md) | Phase 0–11 definitions and exit criteria (the technical roadmap for the MVP build) |
 | [`sprint-1/execution-plan.md`](sprint-1/execution-plan.md) | Sprint 1's operational plan: execution model, Claude model/effort tier per workstream, repo/worktree isolation strategy, phase-by-phase agent+input+output+gate table, verification-pass process |
 
-### `sprint-2/` — current sprint
+### `sprint-2/` — production readiness (complete)
 
 | File | What's in it |
 |---|---|
-| [`sprint-2/pre-sprint-planning.md`](sprint-2/pre-sprint-planning.md) | The post-MVP brainstorm and prioritized backlog this sprint's scope was chosen from |
-| [`sprint-2/sprint-2-plan.md`](sprint-2/sprint-2-plan.md) | This sprint's goals, scope, parallelization plan, and the planning docs it still needs |
+| [`sprint-2/pre-sprint-planning.md`](sprint-2/pre-sprint-planning.md) | The post-MVP brainstorm and prioritized backlog Sprint 2's scope was chosen from |
+| [`sprint-2/sprint-2-plan.md`](sprint-2/sprint-2-plan.md) | Sprint 2's goals, scope, parallelization plan, and the planning docs it needed |
+
+### `sprint-3/` — current sprint
+
+Theme: the developer's own knowledge and workflow, not the application. See
+[`sprint-3/sprint-3-plan.md`](sprint-3/sprint-3-plan.md) for the full plan.
+
+| File | What's in it |
+|---|---|
+| [`sprint-3/sprint-3-plan.md`](sprint-3/sprint-3-plan.md) | This sprint's goals, sequencing, and the planning docs it needed |
+| [`sprint-3/orchestration-retrospective.md`](sprint-3/orchestration-retrospective.md) | How this project's agentic work has actually been orchestrated across Sprint 1–2 — required reading for the Workflow Refinement agent |
+| [`sprint-3/workflow-agent-briefing.md`](sprint-3/workflow-agent-briefing.md) | Standalone briefing for the Agentic Workflow Refinement agent session |
+| [`sprint-3/study-guide-agent-briefing.md`](sprint-3/study-guide-agent-briefing.md) | Standalone briefing for the Study Guide agent session |
 
 ## Cross-reference note
 
