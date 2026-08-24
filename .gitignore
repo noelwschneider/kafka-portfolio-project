@@ -1,4 +1,9 @@
-.claude/
+# Claude Code. Workflow config is tracked on purpose - see docs/workflow/agent-workflow.md.
+# Only machine-local state is ignored.
+.claude/settings.local.json
+.claude/worktrees/
+.claude/.agent-marks/
+.claude/scheduled_tasks.lock
 
 docs/_old/
 docs/agent-reports/
