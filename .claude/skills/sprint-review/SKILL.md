@@ -48,8 +48,9 @@ Sweep for work the sprint surfaced but did not do:
 - TODOs, follow-ups, and "worth doing later" notes in the sprint's commits.
 - Anything you worked around rather than fixed.
 
-Add each as a draft board item with a Priority. Use the `board` skill. A gap that stays in a report is
-a gap nobody will act on.
+Use the `board` skill for each candidate — it covers checking for an existing item first and deciding
+whether something clears the bar for a card at all. A gap that stays in a report and never becomes
+one, when it should have, is a gap nobody will act on.
 
 ## 2. Route process gaps to a durable layer
 

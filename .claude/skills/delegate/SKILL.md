@@ -19,6 +19,11 @@ Pick the preset and tier first; apply the `tier` skill's procedure if it is not 
   not "the reset endpoint."
 - **What has already been tried or ruled out**, and by whom. This is the single most common omission
   and it causes the agent to redo settled work.
+- **A factual premise you're passing along** — check it against the primary source before it goes in
+  the brief, not just against whatever secondhand description you have (a backlog item body, an old
+  report, a summary someone else wrote). A brief built on an unverified premise produces a confident,
+  well-executed fix for the wrong problem, and the agent has no way to know the premise was never
+  checked.
 - **Explicit scope boundaries** — especially the adjacent thing it should *not* do. Name the temptation
   directly: do not implement the option that was rejected, do not touch the live box, do not do a
   polish pass when only a factual fix was asked for.

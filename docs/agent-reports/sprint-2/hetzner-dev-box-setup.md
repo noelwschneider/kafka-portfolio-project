@@ -136,7 +136,7 @@ auto-shutdown; a forgotten box bills continuously up to the plan's monthly cap.
 
 ```
 export HCLOUD_TOKEN=$(cat ~/.config/hcloud-dev-box/token)
-hcloud server list          # should be empty unless a session is actively in progress
+hcloud server list          # should always show the production demo box (always-on); this dev box appears too only while a session is active, per its per-session model above
 hcloud image list --type snapshot   # should show at most one snapshot
 hcloud volume list          # should be empty -- this setup doesn't use standalone volumes
 ```

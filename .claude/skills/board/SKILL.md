@@ -49,6 +49,45 @@ gh project item-edit --project-id PVT_kwHOB38DIc4BhEqT --id <item-id> \
   --field-id <field-id> --single-select-option-id <option-id>
 ```
 
+## Before creating anything: check for an existing item
+
+List the full backlog and read titles *and bodies* for overlap — not just exact title matches. A
+gap phrased differently from an existing item is still the same item.
+
+```bash
+gh project item-list 7 --owner noelwschneider --format json
+```
+
+- **Same scope as an existing item:** do not create a duplicate. Report that it already exists and
+  where.
+- **Genuinely overlaps but adds something the existing item doesn't cover:** say so rather than
+  deciding unilaterally. Creating a second item and letting them silently drift apart is worse than
+  asking which one should hold the additional scope.
+- **Related but distinct** (shares a component or a root cause, not the actual work): create it, and
+  reference the related item in the body so the connection isn't lost.
+
+When genuinely unsure whether something overlaps, say so and let the developer decide rather than
+guessing either way.
+
+## Is this worth a card?
+
+Not everything worth mentioning is worth tracking. Before creating an item, check:
+
+- **Would it be lost otherwise?** If it is already written down somewhere durable — a contract gap in
+  `docs/CHANGELOG-contracts.md`, a rule in `.claude/rules/`, a decision in an ADR — a board item is a
+  second, driftable copy of the same fact. Don't create one.
+- **Is it Task-sized?** A concrete, independently-completable unit someone could pick up without
+  first having to figure out what it even means. If it's still a vague direction rather than a
+  scoped task, say so instead of creating a stub item that will need to be redefined before anyone
+  can act on it.
+- **Is it small enough to just fix?** A typo, a one-line stale note, a broken link. Fixing it costs
+  less than tracking it. Do that instead, and mention it under `## What changed` in whatever report
+  you're already filing.
+
+A defect or gap named honestly in a report's `## Deliberately not covered` is the common source for
+this — and naming it there was already the right call. Converting it to a board item only when it
+clears these three checks is what keeps the backlog signal instead of noise.
+
 ## Rules
 
 **Drafts until scheduled.** Backlog entries start as draft items — cheap, no repo noise. Convert to a
