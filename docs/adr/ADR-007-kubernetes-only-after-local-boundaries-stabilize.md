@@ -19,7 +19,7 @@ through a pod restart loop is far slower than debugging it in an IDE.
 Both source docs say so directly: `docs/planning/sprint-1/implementation-phases.md`'s Phase 0 ends with "Do not
 begin with Kubernetes", `docs/planning/sprint-1/high-level-design.md`'s Kubernetes Design section opens with "run
 application components in Kubernetes only after they work locally", and
-`docs/planning/agent-guidance.md` rule 19 forbids making Kubernetes a prerequisite for early local
+`docs/planning/engineering-rules.md` rule 19 forbids making Kubernetes a prerequisite for early local
 development.
 
 ## Decision
@@ -81,7 +81,7 @@ identical Deployments are not yet a duplication problem worth a templating layer
   replaced (ADR-003 flags the last one).
 - Two supported ways to run the system from Phase 7 onward — Compose and Kubernetes — which means two
   sets of configuration and startup documentation to keep accurate
-  (`docs/planning/agent-guidance.md` rule 14).
+  (`docs/planning/engineering-rules.md` rule 14).
 - Manifests must be written against a system that already exists, so Phase 8 cannot start early even if
   the platform workstream is otherwise idle.
 - Nothing before Phase 8 proves the services are container-friendly. Configuration must come from

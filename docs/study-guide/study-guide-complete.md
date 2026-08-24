@@ -1265,7 +1265,7 @@ operations") and one to state plainly rather than let someone discover.
 > At-least-once. Consumers must tolerate duplicate delivery [...] This project does **not** implement
 > exactly-once semantics, and no document, UI string, or README may claim it.
 
-This is a project rule with its own entry in `docs/planning/agent-guidance.md` (rule 18), and it is
+This is a project rule with its own entry in `docs/planning/engineering-rules.md` (rule 18), and it is
 worth understanding why it is enforced so aggressively.
 
 "Exactly-once" is the most oversold phrase in messaging. Kafka does offer exactly-once *semantics*
@@ -7963,7 +7963,7 @@ silently, with no error anywhere, is gone.
 fewer.
 
 **Does not buy:** exactly-once. Never has, never will —
-*"at-least-once, never exactly-once (agent-guidance.md rule 18)."*
+*"at-least-once, never exactly-once (engineering-rules.md rule 18)."*
 
 That last line appears in the dispatcher's own Javadoc, in the class most likely to be described as
 providing reliable delivery. Exactly where it should be.
@@ -8960,7 +8960,7 @@ Spring Boot 4.1 ships structured logging natively with `ecs`, `logstash`, and `g
 conventional choice — `logstash-logback-encoder` — was rejected on a rule rather than a preference:
 
 > it is an entire extra dependency and a Logback XML file for a capability Spring Boot 4.1 now ships
-> natively — `agent-guidance.md` rule 11 asks for extra infrastructure to be justified, and **"we're
+> natively — `engineering-rules.md` rule 11 asks for extra infrastructure to be justified, and **"we're
 > used to it from other projects" isn't a justification** when the built-in option covers the same
 > ground.
 

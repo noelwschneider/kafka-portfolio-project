@@ -1,6 +1,6 @@
 # Orchestration Retrospective
 
-What this document is for: `.claude/CLAUDE.md` and `agent-guidance.md` capture *rules* — do this,
+What this document is for: `.claude/CLAUDE.md` and `engineering-rules.md` capture *rules* — do this,
 don't do that. This document captures *how the work actually happened* — the patterns, judgment
 calls, and failure modes observed across Sprint 1 and Sprint 2 that the rules were extracted from.
 Written for the Agentic Workflow Refinement task, which needs this texture and has no other way to

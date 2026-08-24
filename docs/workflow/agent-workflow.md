@@ -53,9 +53,37 @@ when the *work* needs isolation: parallelism, a different model or effort tier, 
 or a long job that should not block. Wanting a procedure out of the main context is a skill, not an
 agent — it costs nothing until invoked and introduces no interface to maintain.
 
-## The task lifecycle
+## The sprint cycle
 
-### Plan
+Work runs sprint to sprint, and the cycle closes: a sprint's review is what the next sprint's planning
+reads. The boundary steps are not bookkeeping — they are where practices were lost before they were
+written into durable layers, so they are part of the workflow rather than around it.
+
+```
+plan -> open -> [ delegate -> verify -> land ]* -> close -> review -> plan
+```
+
+A sprint's full scope is decided during planning, executed to completion, then the next sprint is
+planned from whatever is left plus whatever was learned. This is not a fixed-length or fixed-capacity
+iteration in the Scrum sense — there is no established limit on how much belongs in one sprint, and
+that is being felt out empirically rather than fixed in advance. Do not assume a sprint should be
+small because earlier ones were, or object to a large one on that basis alone.
+
+Scope should stay thematically coherent. Work that does not share the sprint's theme waits for one
+that matches it.
+
+Within a sprint, everything scoped into it is completed before anything that was not — with one narrow
+exception. Urgent or unblocking work that emerges mid-sprint, a production-breaking bug or a dependency
+a planned item turns out to need, may jump the queue. It takes the same delegate/verify/land path, and
+`close` logs it retroactively so the board does not quietly become a record of planned work only.
+Routine "while I'm in here" additions are not covered by this and still wait for the next planning
+cycle, however small they seem.
+
+### Plan and open
+
+A sprint opens before any of its work is delegated. Report paths, the board's `Sprint` field, and the
+current-sprint pointer in `docs/planning/README.md` all resolve against the open sprint, so delegating
+into a sprint that has not been opened files its output against the previous one.
 
 Sprint scope and rationale stay in `docs/planning/sprint-N/sprint-N-plan.md`; live status stays on the
 GitHub Project board. Each sprint additionally carries a **model and effort tier assignment** for its
@@ -68,9 +96,8 @@ tiering now survives a sprint boundary.
 ### Delegate
 
 Delegation goes to one of four presets, chosen by task shape rather than by which service the code
-lives in. The service-ownership split in `agent-guidance.md`'s **Recommended AI Agent Work Breakdown**
-was never how work actually divided — the record shows it dividing by how well-specified a task was
-and how it had to be verified.
+lives in. Splitting by service ownership was tried and is not how work actually divides here: across
+31 agent reports it divided by how well-specified a task was and how it had to be verified.
 
 | Preset | Shape | Model / effort |
 |---|---|---|
@@ -82,6 +109,10 @@ and how it had to be verified.
 Pass `model: opus` at spawn time to escalate a specific task without changing the preset — this
 preserves the escalation rule from the execution plan's tier table ("escalate that specific task
 rather than the whole workstream").
+
+Parallelism comes from background subagents and background sessions rather than from agent teams.
+Enabling teams turns any *named* subagent into a teammate that reports only that it went idle,
+without its output, which would silently break a flow that waits on subagent results.
 
 What still belongs in the delegation prompt is only what is genuinely task-specific: exact file paths
 and line numbers, what has already been ruled out, and explicit scope boundaries. Everything that used
@@ -108,6 +139,10 @@ criteria, runs the suite itself, confirms the claimed behavior actually executes
 fail per criterion. It cannot edit source — its tool allowlist excludes `Edit` — so it can only report,
 never quietly fix what it finds.
 
+Results route back through the orchestrator rather than directly between agents. Inter-agent
+messaging is available, but passing finished work agent-to-agent bypasses this checkpoint; its
+value here is agents challenging each other, not accepting each other's conclusions.
+
 One rule governs every verification, human or agent: **verify against the artifact, not the report.** A
 reviewer that reads a summary inherits its claims. The most valuable catch in this project's history —
 a flaky test correctly identified as pre-existing rather than a regression — came from stashing the
@@ -122,28 +157,20 @@ No `Co-Authored-By` trailer.
 
 Unplanned work is logged to the board too, including retroactively.
 
-## Deliberately not adopted
+### Close and review
 
-Recording these so they are not revisited without new reason.
+Closing establishes what happened: the board reconciled against reality, goals confirmed against the
+artifact rather than a report, stale documentation corrected.
 
-**Agent teams.** Experimental, disabled by default, and materially more expensive per task. The
-disqualifying detail is that enabling them turns any *named* subagent into a teammate, and teammates
-report only that they went idle — without their output. An orchestration flow that waits on subagent
-results would break quietly. The parallelism on offer is already available through background
-subagents and background sessions.
+Reviewing decides what changes because of it, and is deliberately a separate pass. A close feels
+finished once the board is green, and a forward-looking step bundled into it gets skipped. Review
+sweeps every agent report's `## Deliberately not covered` section into backlog items, routes each
+process gap to the layer that should hold it, and refines the workflow itself while the evidence is
+fresh.
 
-**A per-sprint tier table.** Superseded rather than rejected. The tiers now live in preset frontmatter,
-which is exactly the durability property the sprint-1 table lacked. A sprint plan records deviations
-only.
-
-**Presets split by service ownership.** The evidence is in this repository: six service-owning agents
-were specified in `agent-guidance.md` and the 31 reports in `docs/agent-reports/` show work dividing
-along a different axis entirely.
-
-**A mesh of agents messaging each other directly.** Inter-agent messaging is real and available, but
-routing results between agents bypasses the verification checkpoint that has caught real defects here.
-Its strongest use is agents *challenging* each other — competing hypotheses, adversarial review — not
-agents accepting each other's finished work.
+This step is why the cycle closes rather than merely repeating. Its absence is what let a well-designed
+tier table and verification pass lapse silently, and made workflow refinement into a whole sprint's
+work instead of a recurring half hour.
 
 ## Open decisions
 

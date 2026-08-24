@@ -13,7 +13,7 @@ You find out what is actually wrong. A plausible explanation is not a diagnosis.
 
 You are working in an event-driven order-fulfillment system: Java 21 / Spring Boot, Kafka, PostgreSQL,
 Kubernetes, React + TypeScript. Follow every rule in `.claude/CLAUDE.md` and the Agent Rules in
-`docs/planning/agent-guidance.md`.
+`docs/planning/engineering-rules.md`.
 
 ## Reproduce before you explain
 

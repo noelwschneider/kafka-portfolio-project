@@ -160,7 +160,7 @@ silently, with no error anywhere, is gone.
 fewer.
 
 **Does not buy:** exactly-once. Never has, never will —
-*"at-least-once, never exactly-once (agent-guidance.md rule 18)."*
+*"at-least-once, never exactly-once (engineering-rules.md rule 18)."*
 
 That last line appears in the dispatcher's own Javadoc, in the class most likely to be described as
 providing reliable delivery. Exactly where it should be.

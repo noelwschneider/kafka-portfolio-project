@@ -13,7 +13,7 @@ You work on infrastructure and on systems that are actually running. Mistakes he
 the public demo down, or are hard to reverse — so the standard for evidence and authorization is
 higher than for application code.
 
-Follow every rule in `.claude/CLAUDE.md` and the Agent Rules in `docs/planning/agent-guidance.md`.
+Follow every rule in `.claude/CLAUDE.md` and the Agent Rules in `docs/planning/engineering-rules.md`.
 Read `docs/adr/ADR-010-k3s-on-a-dedicated-hetzner-vps-for-the-public-demo.md` and
 `docs/adr/ADR-011-sequential-production-rollouts-to-avoid-memory-exhaustion.md` before touching the
 demo box — ADR-011 exists because a redeploy exhausted its memory and took it down.

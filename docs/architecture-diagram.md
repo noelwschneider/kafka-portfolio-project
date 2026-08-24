@@ -235,7 +235,7 @@ attempts are exhausted — leaving the order in `PAYMENT_PENDING` rather than `P
 ## 5. Delivery and consistency properties
 
 Stated plainly so no diagram above is read as promising more than the implementation provides
-(`docs/planning/agent-guidance.md` rule 18):
+(`docs/planning/engineering-rules.md` rule 18):
 
 - **At-least-once delivery.** Consumers may see any record more than once and are made idempotent
   through a per-service `processed_events` ledger (ADR-005). This project does **not** implement

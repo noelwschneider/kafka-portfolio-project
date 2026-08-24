@@ -8,7 +8,7 @@ info:
     only owner of order lifecycle status.
 
     **Frozen by Phase 0.** Changes must follow the coordination protocol in
-    `docs/planning/agent-guidance.md`'s Agent Coordination Rules section: propose the change in this
+    `docs/planning/engineering-rules.md`'s Agent Coordination Rules section: propose the change in this
     file first with a rationale, then update implementations and tests.
 
     Related contracts:

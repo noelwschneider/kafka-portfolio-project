@@ -7,7 +7,7 @@
 
 The project's centerpiece is a set of reproducible failure scenarios: reject this payment, pause that
 consumer, republish this event, publish an unprocessable record. Those controls have to exist
-somewhere reachable, because `docs/planning/agent-guidance.md` rule 10 requires scenario behavior to
+somewhere reachable, because `docs/planning/engineering-rules.md` rule 10 requires scenario behavior to
 be real rather than a frontend animation.
 
 That creates an obvious temptation with an obvious cost. The cheapest way to make a payment fail is a

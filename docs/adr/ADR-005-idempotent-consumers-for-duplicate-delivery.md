@@ -63,7 +63,7 @@ producer retries and can make consume-transform-produce atomic within Kafka. Rej
 mechanism because it does not cover what actually matters here: these consumers' side effects land in
 PostgreSQL, not in Kafka, so Kafka transactions cannot make the database write and the offset commit
 atomic. Enabling it would also invite exactly the overclaim
-`docs/planning/agent-guidance.md` rule 18 forbids — "we use exactly-once" — for a guarantee that would
+`docs/planning/engineering-rules.md` rule 18 forbids — "we use exactly-once" — for a guarantee that would
 not hold end-to-end. The idempotent producer setting is harmless and may be enabled, but the
 correctness argument rests on the ledger.
 

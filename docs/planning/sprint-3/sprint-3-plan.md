@@ -41,7 +41,7 @@ considered for this sprint and deliberately left out — they don't share this s
 breaking that coherence. They remain on the board's `Backlog` view, `Tier 1`/`Tier 2` as already set,
 for a future sprint with a matching theme. Sprint scope should stay thematically coherent going
 forward unless something is genuinely urgent enough to justify the narrow exception in
-`agent-guidance.md`'s Sprint workflow section.
+`engineering-rules.md`'s Sprint workflow section.
 
 ## Dependencies
 

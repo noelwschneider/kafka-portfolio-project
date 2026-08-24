@@ -14,7 +14,7 @@ relevant) its own design/roadmap docs the way `sprint-1/` did for the original M
 |---|---|---|---|
 | 1 | [`project-overview.md`](project-overview.md) | Purpose, product definition, pinned technology decisions, scope do's/don'ts, non-goals | Always first — sets the frame everything else assumes |
 | 2 | [`portfolio-plan.md`](portfolio-plan.md) | Why this project exists (portfolio goals), recruiter/engineer presentation, interview knowledge checklist, "portfolio complete" checklist, resume bullets | Before writing any user-facing copy or judging "is this done" |
-| 3 | [`agent-guidance.md`](agent-guidance.md) | Agent rules (do/don't), per-agent ownership breakdown, coordination rules for contract changes | Read by every agent before starting any task |
+| 3 | [`engineering-rules.md`](engineering-rules.md) | Engineering constraints: core directive, the 20 agent rules, contract coordination | Read by every agent before starting any task |
 | 4 | This file | Index and current-sprint pointer | Always first |
 
 ## Sprints

@@ -66,7 +66,7 @@ Spring Boot 4.1 ships structured logging natively with `ecs`, `logstash`, and `g
 conventional choice — `logstash-logback-encoder` — was rejected on a rule rather than a preference:
 
 > it is an entire extra dependency and a Logback XML file for a capability Spring Boot 4.1 now ships
-> natively — `agent-guidance.md` rule 11 asks for extra infrastructure to be justified, and **"we're
+> natively — `engineering-rules.md` rule 11 asks for extra infrastructure to be justified, and **"we're
 > used to it from other projects" isn't a justification** when the built-in option covers the same
 > ground.
 
