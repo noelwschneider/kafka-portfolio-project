@@ -10,13 +10,13 @@ info:
     section).
 
     **Frozen by Phase 0.** Changes must follow the coordination protocol in
-    `docs/planning/agent-guidance.md`'s Agent Coordination Rules section.
+    `docs/planning/engineering-rules.md`'s Agent Coordination Rules section.
 
     Authorization happens in the event path, not over HTTP: this service consumes `PaymentRequested`
     and publishes `PaymentAuthorized` or `PaymentRejected` (`docs/events/event-catalog.md`). The `/api`
     endpoint below is read-only, and `/demo` controls what the simulator decides.
 
-    **Two namespaces, never mixed** (`docs/planning/agent-guidance.md` rule 9):
+    **Two namespaces, never mixed** (`docs/planning/engineering-rules.md` rule 9):
       - `/api` — read payment attempt outcomes
       - `/demo` — configure simulator behavior; used only by Scenario Service
 

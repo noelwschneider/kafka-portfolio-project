@@ -7,12 +7,12 @@ info:
     The demo/fault-injection control layer — `docs/planning/backend-design.md` 4.6's "dedicated
     Scenario Service". Every path in this document is under `/demo`, and no path here belongs to any
     business API. Business endpoints live in the other four specs and are never given
-    scenario-specific behavior (`docs/planning/agent-guidance.md` rules 9 and 10, and
+    scenario-specific behavior (`docs/planning/engineering-rules.md` rules 9 and 10, and
     `docs/planning/project-overview.md`'s Scope Principles: "do not put scenario-specific hacks inside
     normal business endpoints").
 
     **Frozen by Phase 0.** Changes must follow the coordination protocol in
-    `docs/planning/agent-guidance.md`'s Agent Coordination Rules section. Scenario definitions,
+    `docs/planning/engineering-rules.md`'s Agent Coordination Rules section. Scenario definitions,
     including what each one actually does to the backend, are in `docs/scenarios.md`.
 
     **Scenario runs cause real work.** A run issues real `POST /api/orders` requests, sets real
@@ -370,7 +370,7 @@ paths:
       summary: Query the cross-service event projection (Event Explorer)
       description: |
         **Phase 5 addition**, made through the coordination protocol in
-        `docs/planning/agent-guidance.md`'s Agent Coordination Rules section — a new, additive path;
+        `docs/planning/engineering-rules.md`'s Agent Coordination Rules section — a new, additive path;
         no existing path or schema in this document changed. Resolves `docs/db-ownership.md`'s
         "Event Explorer's backing store has no owner yet": Scenario Service already consumes all four
         domain topics (plus their DLQs) to build scenario-run timelines, so it owns this

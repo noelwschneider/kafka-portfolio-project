@@ -1,9 +1,11 @@
-.claude/
+# Claude Code. Workflow config is tracked on purpose - see docs/workflow/agent-workflow.md.
+# Only machine-local state is ignored.
+.claude/settings.local.json
+.claude/worktrees/
+.claude/.agent-marks/
+.claude/scheduled_tasks.lock
 
-docs/_old/
-docs/agent-reports/
-docs/external/
-docs/study-guide/
+*/_old/
 
 # Maven build output (previously a per-module services/monolith/.gitignore before Phase 3 split
 # the monolith into services/{common,order-service,inventory-service,payment-service,fulfillment-service}/)

@@ -17,7 +17,7 @@ is real code you can read, not a proposal. Shared pieces live in `services/commo
 **A claim this document does not make.** Delivery is at-least-once
 (`docs/events/event-catalog.md` §2). Idempotent consumers make duplicate *delivery* produce no
 duplicate *side effect*. That is not exactly-once, and nothing here should ever be described as
-exactly-once (`docs/planning/agent-guidance.md` rule 18). §7 lists what is still not covered.
+exactly-once (`docs/planning/engineering-rules.md` rule 18). §7 lists what is still not covered.
 
 ---
 
@@ -299,7 +299,7 @@ a replay of the dead-lettered record, or an operator action, and none of them be
 
 Frozen in each service's OpenAPI document since Phase 0, implemented for real in Phase 4. Backed by
 `ConsumerControl` in `services/common/`, over `KafkaListenerEndpointRegistry`. Per
-`docs/planning/agent-guidance.md` rule 9 it lives under `/demo`, never `/api`.
+`docs/planning/engineering-rules.md` rule 9 it lives under `/demo`, never `/api`.
 
 - **Logical listener name = the `@KafkaListener`'s `id`.** That is the registry key, the
   `consumerName` path variable, and the `name` field in the response. Inventory Service uses

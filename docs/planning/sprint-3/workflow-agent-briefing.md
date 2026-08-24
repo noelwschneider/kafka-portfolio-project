@@ -27,7 +27,7 @@ future work on this project — not a portfolio artifact, and not about the app.
 1. `.claude/CLAUDE.md` — repo norms, and two specific "known gotcha" call-outs already written down
    from real experience (subagents ending their turn on unfinished background work; subagents
    delegating their own assigned work to a further subagent). These are real, not hypothetical.
-2. `docs/planning/agent-guidance.md` — the Sprint workflow section, the 20 Agent Rules, the per-service
+2. `docs/planning/engineering-rules.md` — the Sprint workflow section, the 20 Agent Rules, the per-service
    agent ownership breakdown from the original MVP plan, and the GitHub Project board section (added
    this sprint — Status/Priority/Sprint fields, the Initiative/Task hierarchy using native GitHub
    sub-issues, draft-vs-real-issue policy).
@@ -89,7 +89,7 @@ workflow, not when a list of subtasks is checked off. Don't manufacture a false 
 wrapping up early with a summary; let the conversation actually run its course.
 
 Within that conversation, still aim to make concrete, low-risk changes directly rather than only
-proposing them — a subagent preset, a slash command, an `agent-guidance.md` update — when something
+proposing them — a subagent preset, a slash command, an `engineering-rules.md` update — when something
 becomes clearly worth doing. For anything that would meaningfully change how the *primary
 orchestrating session* (the one the developer talks to day-to-day) behaves, that's exactly the kind of
 thing to raise as a discussion point in the conversation itself, not decide unilaterally and report

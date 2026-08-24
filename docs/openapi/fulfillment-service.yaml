@@ -13,9 +13,9 @@ info:
     (`docs/planning/project-overview.md`'s Explicit Non-Goals section).
 
     **Frozen by Phase 0.** Changes must follow the coordination protocol in
-    `docs/planning/agent-guidance.md`'s Agent Coordination Rules section.
+    `docs/planning/engineering-rules.md`'s Agent Coordination Rules section.
 
-    **Two namespaces, never mixed** (`docs/planning/agent-guidance.md` rule 9):
+    **Two namespaces, never mixed** (`docs/planning/engineering-rules.md` rule 9):
       - `/api` — read shipment records
       - `/demo` — consumer control; used only by Scenario Service
 

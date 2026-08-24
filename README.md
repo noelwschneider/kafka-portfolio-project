@@ -254,7 +254,7 @@ mvn test
 
 ## What this project demonstrates
 
-Verified against the implementation as of this writing, not aspirational (`docs/planning/agent-guidance.md`
+Verified against the implementation as of this writing, not aspirational (`docs/planning/engineering-rules.md`
 rule 18 — no claim here is stronger than what's actually built):
 
 - Designed and built an event-driven order fulfillment platform (Java 21, Spring Boot, Apache Kafka,

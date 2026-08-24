@@ -87,5 +87,5 @@ its own tables.
 **Honest limits.** This project provides at-least-once delivery with idempotent consumers, and
 per-partition ordering for a single order's events. It does not provide exactly-once semantics, and
 no document, UI string, or README may claim it does
-(`docs/planning/agent-guidance.md` rule 18). Cross-order ordering is not guaranteed and must not be
+(`docs/planning/engineering-rules.md` rule 18). Cross-order ordering is not guaranteed and must not be
 relied on.
