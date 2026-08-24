@@ -148,7 +148,7 @@ implementation pinned down something the prose left open:
   the order sits at `PENDING` forever.
 - This must be stated, not implied, in the README and architecture page. "Durable event publication" is
   not a claim this project may make before Phase 6
-  (`docs/planning/agent-guidance.md` rule 18).
+  (`docs/planning/engineering-rules.md` rule 18).
 
 **Once implemented (Phase 6, Order Service).**
 

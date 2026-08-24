@@ -2,7 +2,7 @@
 
 **Status:** frozen by Phase 0. This file is the single source of truth for event names, the event
 envelope, topic assignment, and publisher/consumer relationships. Any workstream that needs a change
-here must follow the coordination protocol in `docs/planning/agent-guidance.md`'s Agent Coordination
+here must follow the coordination protocol in `docs/planning/engineering-rules.md`'s Agent Coordination
 Rules section (propose the change in this file first, state why, then update implementations and
 tests) — not work around it locally.
 

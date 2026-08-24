@@ -1,7 +1,7 @@
 # Order Fulfillment Systems Lab
 ## Execution Plan (Agent Orchestration Reference)
 
-This document is the operational companion to the **architecture docs** — `project-overview.md`, `portfolio-plan.md`, `backend-design.md`, `frontend-design.md`, `high-level-design.md`, `implementation-phases.md`, and `agent-guidance.md`. Together those define *what* to build and *why*; see [`README.md`](README.md) for what's in each. This document defines *who builds it, in what order, with which Claude model/effort tier, against which contracts, and using which tools*.
+This document is the operational companion to the **architecture docs** — `project-overview.md`, `portfolio-plan.md`, `backend-design.md`, `frontend-design.md`, `high-level-design.md`, `implementation-phases.md`, and `engineering-rules.md`. Together those define *what* to build and *why*; see [`README.md`](README.md) for what's in each. This document defines *who builds it, in what order, with which Claude model/effort tier, against which contracts, and using which tools*.
 
 References below cite architecture docs by filename, not by section number — the original single-document section numbers (§0–§42) no longer resolve uniquely now that the content is split across 8 files with independently-numbered sections.
 
@@ -25,7 +25,7 @@ An executing agent should be handed **this document plus the specific contract/s
 
 ## 1.3 Why not fully parallel from Phase 0
 
-Contract changes mid-flight (an endpoint shape, an event field) would force rework across every agent already building against them. Freezing contracts before fan-out avoids that. This matches agent-guidance.md's own coordination rule (Agent Coordination Rules section): "freeze initial endpoint names... before parallel work."
+Contract changes mid-flight (an endpoint shape, an event field) would force rework across every agent already building against them. Freezing contracts before fan-out avoids that. This matches engineering-rules.md's own coordination rule (Agent Coordination Rules section): "freeze initial endpoint names... before parallel work."
 
 ---
 
@@ -138,7 +138,7 @@ For each phase: agent role, model/effort (from §2 above), required inputs, prod
 
 # 5. Coordination Protocol
 
-Restates and operationalizes agent-guidance.md's Agent Coordination Rules section:
+Restates and operationalizes engineering-rules.md's Agent Coordination Rules section:
 
 1. A contract file under `docs/` is the only thing a workstream may treat as ground truth about another service.
 2. If a workstream discovers the frozen contract is wrong or insufficient mid-implementation, it stops, proposes the change in the relevant `docs/` file with a one-line rationale, and does not proceed on a local workaround.

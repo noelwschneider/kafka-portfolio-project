@@ -5,7 +5,7 @@
 
 ## Context
 
-`docs/planning/agent-guidance.md` rule 17 requires "consistent logging with correlation IDs."
+`docs/planning/engineering-rules.md` rule 17 requires "consistent logging with correlation IDs."
 `docs/planning/sprint-1/high-level-design.md`'s Observability section asks every relevant log line to
 carry service name, order ID, correlation ID, event ID, and event type where possible.
 
@@ -74,7 +74,7 @@ report), and without the fix that bug would have been undiagnosable from logs al
 names, nested vs. flat MDC), and a common choice in real production systems already familiar to
 the audience this portfolio targets. Rejected because it is an entire extra dependency and a
 Logback XML file for a capability Spring Boot 4.1 now ships natively — `docs/planning/
-agent-guidance.md` rule 11 asks for extra infrastructure to be justified, and "we're used to it
+engineering-rules.md` rule 11 asks for extra infrastructure to be justified, and "we're used to it
 from other projects" isn't a justification when the built-in option covers the same ground.
 
 **Plain-text console pattern with `%X{correlationId}` appended, no structured format at all.**

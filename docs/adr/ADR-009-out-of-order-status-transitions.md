@@ -126,7 +126,7 @@ insert rather than a read (`docs/reliability-pattern.md` §2.2).
 
 ### What Order Service's aggregate status now actually guarantees
 
-Stated precisely, because rule 18 of `docs/planning/agent-guidance.md` forbids claiming more than is
+Stated precisely, because rule 18 of `docs/planning/engineering-rules.md` forbids claiming more than is
 implemented:
 
 - **`orders.status` only ever holds a status reachable by a valid sequence of

@@ -8,11 +8,11 @@ An interactive, event-driven order-fulfillment portfolio system (Java/Spring Boo
 
 - `docs/planning/` — the design/planning docs, organized by sprint (`docs/planning/README.md` is the index and states which sprint is current). Four cross-sprint files live at the top level (project overview, portfolio goals, agent guidance, the README/index itself); everything else — including each sprint's own backend/frontend/high-level design and execution plan — lives under `docs/planning/sprint-N/`. **Treat sprint-1's docs as read-only, frozen historical record of the original MVP build.** If one is actually wrong (not just underspecified), flag it in your output rather than editing it directly. Later sprints' planning docs are living documents for that sprint's duration.
 - `docs/_old/` — the original single-file draft, kept for history only. Not authoritative; don't cite it.
-- `docs/openapi/`, `docs/events/`, `docs/adr/`, `docs/order-state-machine.md`, `docs/db-ownership.md`, `docs/scenarios.md`, `docs/architecture-diagram.md` — the **frozen contracts** produced by Phase 0 (once it's run). Once these exist, they are the single source of truth for cross-service integration — prefer them over re-deriving shapes from `docs/planning/backend-design.md` prose.
+- `docs/openapi/`, `docs/events/`, `docs/adr/`, `docs/order-state-machine.md`, `docs/db-ownership.md`, `docs/scenarios.md`, `docs/architecture-diagram.md` — the **frozen contracts**. They are the single source of truth for cross-service integration — prefer them over re-deriving shapes from `docs/planning/sprint-1/backend-design.md` prose.
 
 ## Hard rules
 
-Follow all 20 Agent Rules in `docs/planning/agent-guidance.md` in full — always in effect. That file is the single authoritative list; don't rely on a restatement here going stale (an earlier version of this section silently dropped 4 of the 20 rules after one edit — that's why this section is now a pointer, not a copy).
+Follow all 20 Agent Rules in `docs/planning/engineering-rules.md` in full — always in effect. That file is the single authoritative list; don't rely on a restatement here going stale (an earlier version of this section silently dropped 4 of the 20 rules after one edit — that's why this section is now a pointer, not a copy).
 
 The handful most likely to cause real damage if missed in a session that skips rereading the full list:
 
@@ -40,9 +40,12 @@ The handful most likely to cause real damage if missed in a session that skips r
 
 ## Orchestration reference
 
-`docs/workflow/agent-workflow.md` is the operating manual for delegated work: how tasks are
-delegated, verified, and landed, and why the process is shaped the way it is. Read it before
-spawning or briefing any subagent.
+`docs/workflow/user-guide.md` is how the work is actually run, stage by stage, with the command
+glossary. `docs/workflow/agent-workflow.md` is the design and the reasoning behind it. Read the user
+guide before running a sprint or briefing any subagent.
+
+A sprint is opened before its work is delegated — report paths and board fields resolve against the
+open sprint.
 
 Delegate to one of the four presets in `.claude/agents/` — `implementer`, `investigator`,
 `verifier`, `platform` — chosen by task shape, not by which service the code lives in. Each preset

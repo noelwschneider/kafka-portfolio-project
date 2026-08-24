@@ -10,13 +10,13 @@ info:
     orchestration".
 
     **Frozen by Phase 0.** Changes must follow the coordination protocol in
-    `docs/planning/agent-guidance.md`'s Agent Coordination Rules section.
+    `docs/planning/engineering-rules.md`'s Agent Coordination Rules section.
 
     Reservation work happens in the event path: this service consumes `OrderCreated` and publishes
     `InventoryReserved` or `InventoryReservationFailed`, and consumes `PaymentRejected` to release a
     reservation and publish `InventoryReleased` (`docs/events/event-catalog.md`).
 
-    **Two namespaces, never mixed** (`docs/planning/agent-guidance.md` rule 9):
+    **Two namespaces, never mixed** (`docs/planning/engineering-rules.md` rule 9):
       - `/api` — production-style stock administration
       - `/demo` — fault injection and consumer control, used only by Scenario Service
 

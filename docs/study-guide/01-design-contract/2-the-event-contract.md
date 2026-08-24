@@ -266,7 +266,7 @@ operations") and one to state plainly rather than let someone discover.
 > At-least-once. Consumers must tolerate duplicate delivery [...] This project does **not** implement
 > exactly-once semantics, and no document, UI string, or README may claim it.
 
-This is a project rule with its own entry in `docs/planning/agent-guidance.md` (rule 18), and it is
+This is a project rule with its own entry in `docs/planning/engineering-rules.md` (rule 18), and it is
 worth understanding why it is enforced so aggressively.
 
 "Exactly-once" is the most oversold phrase in messaging. Kafka does offer exactly-once *semantics*

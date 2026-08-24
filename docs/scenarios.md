@@ -12,7 +12,7 @@ Two rules govern everything below:
 
 - **Scenario behavior is real.** Each scenario drives genuine HTTP requests, genuine Kafka records,
   and genuine persistence. Nothing here is a frontend animation, and no scenario-specific branch is
-  allowed inside `/api` business logic (`docs/planning/agent-guidance.md` rules 9 and 10).
+  allowed inside `/api` business logic (`docs/planning/engineering-rules.md` rules 9 and 10).
 - **Scenarios use the normal APIs.** A scenario creates orders through `POST /api/orders`, the same
   endpoint any client uses. What a scenario may do beyond that is configure a service's demo-only
   controls (payment behavior, consumer pause) or republish a record — never take a shortcut through
