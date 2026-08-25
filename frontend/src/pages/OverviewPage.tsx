@@ -1,20 +1,14 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { fetchAllServiceHealth, type ServiceHealth } from '../api/health';
-import { listOrders } from '../api/orders';
-import { listScenarioRuns, runScenario, type ScenarioName } from '../api/scenarios';
-import { StatusBadge } from '../components/StatusBadge';
+import { listScenarios, runScenario, type ScenarioName } from '../api/scenarios';
+import { ApiRequestError } from '../api/client';
+import { LoadingHint } from '../components/LoadingHint';
 
 // frontend-design.md §12.1: four business services + Kafka + PostgreSQL, plus Scenario Service
 // (added in this phase). Kafka/PostgreSQL have no HTTP health endpoint of their own reachable from
-// the browser, so they're reported through each service's Actuator health, which typically
-// includes a `kafka` and a `db` component — see the note rendered on the page itself.
-const QUICK_SCENARIOS: { name: ScenarioName; label: string }[] = [
-  { name: 'standard-order', label: 'Standard Fulfillment' },
-  { name: 'out-of-stock', label: 'Inventory Outage' },
-  { name: 'duplicate-event', label: 'Duplicate Event' },
-  { name: 'payment-failure', label: 'Payment Rejection' },
-];
+// the browser, so they're reported through each service's Actuator health, which includes a
+// `kafka` and a `db` component once `management.endpoint.health.show-components: always` is set.
 
 function stateLabel(health: ServiceHealth | undefined): string {
   if (!health) return 'checking…';
@@ -52,35 +46,41 @@ function deriveInfraStatus(healths: ServiceHealth[], componentKey: string): { st
   return { state: 'no data', source: null };
 }
 
+// "no data" means no reachable service has reported this component yet — a benign, designed
+// absence, not a fault — so it gets the same "expected" treatment as REJECTED_OUT_OF_STOCK/
+// PAYMENT_FAILED elsewhere in the app, distinct from both a healthy UP and an actual reported
+// failure (e.g. a component whose own status came back DOWN).
+function infraClass(state: string): string {
+  if (state === 'UP') return 'status status-success';
+  if (state === 'no data') return 'status status-expected';
+  return 'status status-failure';
+}
+
 export function OverviewPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { data: healths } = useQuery({
+  const { data: healths, isLoading: healthsLoading } = useQuery({
     queryKey: ['overview-health'],
     queryFn: fetchAllServiceHealth,
     refetchInterval: 10_000,
   });
 
-  const { data: orders, isError: ordersError } = useQuery({
-    queryKey: ['orders'],
-    queryFn: listOrders,
-    retry: false,
-  });
-
-  const { data: runs } = useQuery({
-    queryKey: ['scenario-runs', 'recent'],
-    queryFn: () => listScenarioRuns({ size: 5 }),
-    retry: false,
+  const { data: scenarios, isLoading: scenariosLoading, isError: scenariosError, error: scenariosErrorObj } = useQuery({
+    queryKey: ['scenarios'],
+    queryFn: listScenarios,
   });
 
   const runMutation = useMutation({
-    mutationFn: runScenario,
+    mutationFn: (name: ScenarioName) => runScenario(name),
     onSuccess: (run) => {
       queryClient.invalidateQueries({ queryKey: ['scenario-runs'] });
       navigate(`/scenario-runs/${run.id}`);
     },
   });
+
+  const runError =
+    runMutation.error instanceof ApiRequestError ? runMutation.error.apiError.message : runMutation.error?.message;
 
   const healthByName = new Map((healths ?? []).map((h) => [h.name, h]));
   const kafka = deriveInfraStatus(healths ?? [], 'kafka');
@@ -88,19 +88,8 @@ export function OverviewPage() {
 
   return (
     <section>
-      <div className="overview-hero">
-        <h1>Order Fulfillment Systems Lab</h1>
-        <p className="overview-lede">
-          A distributed order-fulfillment sandbox: four Spring Boot services (Order, Inventory,
-          Payment, Fulfillment) coordinate exclusively through Kafka — no service calls another
-          business service directly. A dedicated Scenario Service drives real, reproducible failure
-          and recovery scenarios (duplicate delivery, consumer outages, dead-lettering, inventory
-          contention) against the same public APIs any client uses, so what you trigger here is the
-          same code path a real order takes, not a UI animation.
-        </p>
-      </div>
-
       <h2>System Status</h2>
+      {healthsLoading && <LoadingHint label="Loading service health…" />}
       <table className="status-table">
         <tbody>
           {['Order Service', 'Inventory Service', 'Payment Service', 'Fulfillment Service', 'Scenario Service'].map(
@@ -119,7 +108,7 @@ export function OverviewPage() {
           <tr>
             <td>Kafka</td>
             <td>
-              <span className={kafka.state === 'UP' ? 'status status-success' : 'status status-pending'}>
+              <span className={infraClass(kafka.state)}>
                 {kafka.state}
                 {kafka.source ? ` (via ${kafka.source})` : ''}
               </span>
@@ -128,7 +117,7 @@ export function OverviewPage() {
           <tr>
             <td>PostgreSQL</td>
             <td>
-              <span className={db.state === 'UP' ? 'status status-success' : 'status status-pending'}>
+              <span className={infraClass(db.state)}>
                 {db.state}
                 {db.source ? ` (via ${db.source})` : ''}
               </span>
@@ -136,62 +125,39 @@ export function OverviewPage() {
           </tr>
         </tbody>
       </table>
-      <p className="hint">
-        Statuses come from each service's real <code>/actuator/health</code> endpoint, polled every
-        10s. Kafka/PostgreSQL rows are read from whichever service's health response includes those
-        components — "no data" means no reachable service reported one yet, not that it's down.
-      </p>
+      <p className="hint">"No data" means none has reported yet, not that it's down.</p>
 
-      <h2>Quick Scenarios</h2>
-      <div className="quick-scenarios">
-        {QUICK_SCENARIOS.map((s) => (
-          <button
-            key={s.name}
-            onClick={() => runMutation.mutate(s.name)}
-            disabled={runMutation.isPending}
-          >
-            {s.label}
-          </button>
+      <h2>Scenarios</h2>
+      <p className="hint">See how the system handles a variety of scenarios.</p>
+
+      {scenariosLoading && <LoadingHint label="Loading scenarios…" />}
+      {scenariosError && (
+        <p className="error">Could not reach Scenario Service: {(scenariosErrorObj as Error).message}.</p>
+      )}
+      {runError && <p className="error">{runError}</p>}
+
+      <div className="scenario-grid">
+        {scenarios?.map((scenario) => (
+          <article key={scenario.name} className="scenario-card">
+            <div className="scenario-card-header">
+              <h3>{scenario.title}</h3>
+              {!scenario.available && <span className="badge badge-muted">Not available yet</span>}
+            </div>
+            <p className="scenario-card-description">{scenario.description}</p>
+
+            <button
+              className="button-primary"
+              onClick={() => runMutation.mutate(scenario.name)}
+              disabled={!scenario.available || runMutation.isPending}
+              title={scenario.available ? undefined : 'Not implemented yet'}
+            >
+              {runMutation.isPending && runMutation.variables === scenario.name
+                ? 'Starting…'
+                : 'Run Scenario'}
+            </button>
+          </article>
         ))}
-        <button onClick={() => navigate('/scenarios')}>All scenarios →</button>
       </div>
-      {runMutation.isError && <p className="error">{(runMutation.error as Error).message}</p>}
-
-      <h2>Recent Orders</h2>
-      {ordersError && <p className="hint">Order Service unreachable or not yet running.</p>}
-      {orders && orders.content.length === 0 && <p>No orders yet.</p>}
-      {orders && orders.content.length > 0 && (
-        <table className="orders-table">
-          <tbody>
-            {orders.content.slice(0, 5).map((order) => (
-              <tr key={order.id} className="order-row" onClick={() => navigate(`/orders/${order.id}`)}>
-                <td>{order.id}</td>
-                <td>
-                  <StatusBadge status={order.status} />
-                </td>
-                <td>{new Date(order.createdAt).toLocaleString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      <h2>Recent Scenario Runs</h2>
-      {!runs && <p className="hint">Scenario Service unreachable or not yet running.</p>}
-      {runs && runs.content.length === 0 && <p>No scenario runs yet.</p>}
-      {runs && runs.content.length > 0 && (
-        <table className="orders-table">
-          <tbody>
-            {runs.content.map((run) => (
-              <tr key={run.id} className="order-row" onClick={() => navigate(`/scenario-runs/${run.id}`)}>
-                <td>{run.scenarioName}</td>
-                <td>{run.status}</td>
-                <td>{new Date(run.startedAt).toLocaleString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
     </section>
   );
 }

@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getOrder, type OrderDetail } from '../api/orders';
 import { ORDER_SERVICE_BASE_URL, subscribeToStream } from '../api/client';
 import { StatusBadge } from '../components/StatusBadge';
+import { LoadingHint } from '../components/LoadingHint';
+import { queryEvents, type EventQueryFilters, type EventRecord } from '../api/events';
 
 interface Props {
   orderId: string;
@@ -33,6 +35,139 @@ interface OrderStatusChangedMessage {
 }
 
 type StreamState = 'connecting' | 'live' | 'unavailable';
+
+// Order-scoped replacement for the retired standalone Event Explorer page (issue #7). Same
+// GET /demo/events projection and the same EventRecord shape — `orderId` is now fixed to this
+// page's order instead of being one filter among several, so the remaining filters (type,
+// correlation id, service, topic, dead-lettered) are tucked behind a details/summary disclosure
+// rather than always-visible form chrome.
+function EventTimelineEntry({ event }: { event: EventRecord }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <li className="timeline-entry">
+      <div className="timeline-row" onClick={() => setExpanded((e) => !e)}>
+        <span className="timeline-time">
+          {new Date(event.occurredAt).toLocaleTimeString(undefined, {
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          })}
+        </span>
+        <span className="timeline-kind">{event.eventType}</span>
+        <span className="timeline-label">
+          {event.topic} {event.deadLettered && <span className="badge badge-muted">DLQ</span>}
+        </span>
+        <span className="timeline-expand">{expanded ? '▾' : '▸'}</span>
+      </div>
+      {expanded && (
+        <dl className="timeline-detail">
+          <div className="timeline-detail-row">
+            <dt>eventId</dt>
+            <dd>{event.eventId}</dd>
+          </div>
+          <div className="timeline-detail-row">
+            <dt>correlationId</dt>
+            <dd>{event.correlationId}</dd>
+          </div>
+          <div className="timeline-detail-row">
+            <dt>producer</dt>
+            <dd>{event.producer}</dd>
+          </div>
+          <div className="timeline-detail-row">
+            <dt>partition / offset</dt>
+            <dd>{event.partition} / {event.offset}</dd>
+          </div>
+          <div className="timeline-detail-row">
+            <dt>payload</dt>
+            <dd>{JSON.stringify(event.payload)}</dd>
+          </div>
+        </dl>
+      )}
+    </li>
+  );
+}
+
+function EventTimelineSection({ orderId }: { orderId: string }) {
+  const [filters, setFilters] = useState<Omit<EventQueryFilters, 'orderId'>>({});
+
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ['order-events', orderId, filters],
+    queryFn: () => queryEvents({ ...filters, orderId }),
+  });
+
+  return (
+    <>
+      <h3>Events</h3>
+      <details className="scenario-card-details">
+        <summary>Filter</summary>
+        <div className="event-filters">
+          <label>
+            Event type
+            <input
+              value={filters.eventType ?? ''}
+              onChange={(e) => setFilters((f) => ({ ...f, eventType: e.target.value || undefined }))}
+              placeholder="OrderCreated"
+            />
+          </label>
+          <label>
+            Correlation ID
+            <input
+              value={filters.correlationId ?? ''}
+              onChange={(e) => setFilters((f) => ({ ...f, correlationId: e.target.value || undefined }))}
+            />
+          </label>
+          <label>
+            Service
+            <input
+              value={filters.service ?? ''}
+              onChange={(e) => setFilters((f) => ({ ...f, service: e.target.value || undefined }))}
+              placeholder="inventory-service"
+            />
+          </label>
+          <label>
+            Topic
+            <input
+              value={filters.topic ?? ''}
+              onChange={(e) => setFilters((f) => ({ ...f, topic: e.target.value || undefined }))}
+              placeholder="orders.events"
+            />
+          </label>
+          <label>
+            Dead-lettered
+            <select
+              value={filters.deadLettered === undefined ? '' : String(filters.deadLettered)}
+              onChange={(e) =>
+                setFilters((f) => ({
+                  ...f,
+                  deadLettered: e.target.value === '' ? undefined : e.target.value === 'true',
+                }))
+              }
+            >
+              <option value="">Any</option>
+              <option value="true">Dead-lettered only</option>
+              <option value="false">Not dead-lettered</option>
+            </select>
+          </label>
+        </div>
+      </details>
+
+      {isLoading && <LoadingHint label="Loading events…" />}
+      {isError && (
+        <p className="error">Could not reach Scenario Service: {(error as Error).message}.</p>
+      )}
+      {data && data.length === 0 && <p className="hint">No events match these filters.</p>}
+      {data && data.length > 0 && (
+        <ol className="timeline">
+          {data.map((event) => (
+            <EventTimelineEntry key={event.eventId} event={event} />
+          ))}
+        </ol>
+      )}
+    </>
+  );
+}
 
 export function OrderDetailPage({ orderId, onBack }: Props) {
   const queryClient = useQueryClient();
@@ -71,6 +206,7 @@ export function OrderDetailPage({ orderId, onBack }: Props) {
             // Malformed payload — still a signal the connection is live; refetch anyway.
           }
           queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+          queryClient.invalidateQueries({ queryKey: ['order-events', orderId] });
         },
         onError: () => {
           // EventSource retries on its own; if it never recovers the poll above keeps the page
@@ -100,7 +236,7 @@ export function OrderDetailPage({ orderId, onBack }: Props) {
         {streamState === 'unavailable' && 'Live stream unavailable — falling back to polling'}
       </div>
 
-      {isLoading && <p>Loading order…</p>}
+      {isLoading && <LoadingHint label="Loading order…" />}
       {isError && <p className="error">{(error as Error).message}</p>}
 
       {data && (
@@ -156,6 +292,8 @@ export function OrderDetailPage({ orderId, onBack }: Props) {
               </li>
             ))}
           </ol>
+
+          <EventTimelineSection orderId={orderId} />
         </div>
       )}
     </section>

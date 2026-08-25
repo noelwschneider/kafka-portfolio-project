@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createOrder, type CreateOrderItem } from '../api/orders';
 import { listInventory } from '../api/inventory';
 import { ApiRequestError } from '../api/client';
+import { LoadingHint } from '../components/LoadingHint';
 
 interface Props {
   onOrderCreated: (orderId: string) => void;
@@ -11,15 +12,29 @@ interface Props {
 
 interface LineDraft {
   sku: string;
-  quantity: number;
+  // '' represents the field being genuinely empty while the user is editing it — coercing to 0
+  // made the input briefly show 0 whenever it was cleared (issue #24).
+  quantity: number | '';
 }
 
 export function CreateOrderPage({ onOrderCreated, onCancel }: Props) {
   const queryClient = useQueryClient();
-  const { data: inventory } = useQuery({ queryKey: ['inventory'], queryFn: listInventory });
+  const { data: inventory, isLoading: inventoryLoading } = useQuery({
+    queryKey: ['inventory'],
+    queryFn: listInventory,
+  });
 
   const [customerId, setCustomerId] = useState('demo-customer');
-  const [lines, setLines] = useState<LineDraft[]>([{ sku: '', quantity: 1 }]);
+  // Order lines the customer has actually picked, added one at a time from the inventory table
+  // below (issue #22) — no placeholder empty line, since there's no dropdown left to leave blank.
+  const [lines, setLines] = useState<LineDraft[]>([]);
+  // Indexes of lines whose quantity failed submit-time validation (quantity cleared to empty)
+  // so the field can be highlighted with an inline message instead of the input silently
+  // coercing to 0.
+  const [invalidQuantityLines, setInvalidQuantityLines] = useState<Set<number>>(new Set());
+  // Submit-time validation for having picked nothing at all — distinct from the per-line
+  // quantity message above.
+  const [noLinesError, setNoLinesError] = useState(false);
 
   const mutation = useMutation({
     mutationFn: createOrder,
@@ -33,8 +48,17 @@ export function CreateOrderPage({ onOrderCreated, onCancel }: Props) {
     setLines((prev) => prev.map((line, i) => (i === index ? { ...line, ...patch } : line)));
   }
 
-  function addLine() {
-    setLines((prev) => [...prev, { sku: '', quantity: 1 }]);
+  function addSkuToOrder(sku: string) {
+    setNoLinesError(false);
+    setLines((prev) => {
+      const existingIndex = prev.findIndex((line) => line.sku === sku);
+      if (existingIndex === -1) {
+        return [...prev, { sku, quantity: 1 }];
+      }
+      return prev.map((line, i) =>
+        i === existingIndex ? { ...line, quantity: (line.quantity === '' ? 0 : line.quantity) + 1 } : line,
+      );
+    });
   }
 
   function removeLine(index: number) {
@@ -43,71 +67,128 @@ export function CreateOrderPage({ onOrderCreated, onCancel }: Props) {
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    const items: CreateOrderItem[] = lines
-      .filter((line) => line.sku)
-      .map((line) => ({ sku: line.sku, quantity: line.quantity }));
+
+    if (lines.length === 0) {
+      setNoLinesError(true);
+      return;
+    }
+    setNoLinesError(false);
+
+    const invalid = new Set<number>();
+    lines.forEach((line, index) => {
+      if (line.quantity === '' || line.quantity < 1) {
+        invalid.add(index);
+      }
+    });
+    if (invalid.size > 0) {
+      setInvalidQuantityLines(invalid);
+      return;
+    }
+    setInvalidQuantityLines(new Set());
+
+    const items: CreateOrderItem[] = lines.map((line) => ({ sku: line.sku, quantity: line.quantity as number }));
     mutation.mutate({ customerId, items });
   }
 
   const errorMessage =
     mutation.error instanceof ApiRequestError ? mutation.error.apiError.message : mutation.error?.message;
 
+  // Rendered inline as a modal panel from OrdersListPage (issue #7) rather than as a standalone
+  // routed page — no <section>/page-header chrome here; the modal wrapper supplies the title and
+  // close affordance, this component owns only the form itself.
   return (
-    <section>
-      <div className="page-header">
-        <h1>New order</h1>
-        <button onClick={onCancel}>Back to orders</button>
-      </div>
-
+    <>
       <form onSubmit={handleSubmit} className="order-form">
         <label>
           Customer id
           <input value={customerId} onChange={(e) => setCustomerId(e.target.value)} required />
         </label>
 
+        {inventoryLoading && <LoadingHint label="Loading inventory…" />}
+
+        {inventory && inventory.length > 0 && (
+          // Real inventory presented as a scannable table (issue #22) rather than dropdown option
+          // text. No price column: InventoryItem (docs/openapi/inventory-service.yaml) carries no
+          // price field, and unitPrice on an order line is captured server-side by the Order
+          // Service from its own seeded SKU price map at order-creation time — never fetched from
+          // Inventory Service (docs/openapi/order-service.yaml, OrderItem.unitPrice) — so there is
+          // no real price to show here without fabricating one.
+          <table className="inventory-table">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>SKU</th>
+                <th>Available</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {inventory.map((item) => {
+                const free = item.availableQuantity - item.reservedQuantity;
+                return (
+                  <tr key={item.sku}>
+                    <td>{item.displayName}</td>
+                    <td className="order-id-cell">{item.sku}</td>
+                    <td>{free}</td>
+                    <td>
+                      <button type="button" onClick={() => addSkuToOrder(item.sku)} disabled={free <= 0}>
+                        Add
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+
         <div className="line-items">
-          {lines.map((line, index) => (
-            <div className="line-item" key={index}>
-              <select
-                value={line.sku}
-                onChange={(e) => updateLine(index, { sku: e.target.value })}
-                required
-              >
-                <option value="" disabled>
-                  Select SKU
-                </option>
-                {inventory?.map((item) => (
-                  <option key={item.sku} value={item.sku}>
-                    {item.sku} — {item.displayName} ({item.availableQuantity - item.reservedQuantity} free)
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                min={1}
-                max={100}
-                value={line.quantity}
-                onChange={(e) => updateLine(index, { quantity: Number(e.target.value) })}
-                required
-              />
-              {lines.length > 1 && (
+          {lines.length === 0 && <p className="hint">No items added yet — add one from the table above.</p>}
+          {lines.map((line, index) => {
+            const item = inventory?.find((i) => i.sku === line.sku);
+            return (
+              <div className="line-item" key={line.sku}>
+                <span className="line-item-name">{item ? item.displayName : line.sku}</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={line.quantity}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    updateLine(index, { quantity: raw === '' ? '' : Number(raw) });
+                    if (invalidQuantityLines.has(index)) {
+                      setInvalidQuantityLines((prev) => {
+                        const next = new Set(prev);
+                        next.delete(index);
+                        return next;
+                      });
+                    }
+                  }}
+                  className={invalidQuantityLines.has(index) ? 'input-invalid' : undefined}
+                  aria-invalid={invalidQuantityLines.has(index)}
+                />
+                {invalidQuantityLines.has(index) && <span className="field-error">Enter a quantity</span>}
                 <button type="button" onClick={() => removeLine(index)}>
                   Remove
                 </button>
-              )}
-            </div>
-          ))}
-          <button type="button" onClick={addLine}>
-            Add item
-          </button>
+              </div>
+            );
+          })}
         </div>
 
+        {noLinesError && <p className="error">Add at least one item.</p>}
         {errorMessage && <p className="error">{errorMessage}</p>}
 
-        <button type="submit" disabled={mutation.isPending}>
-          {mutation.isPending ? 'Placing order…' : 'Place order'}
-        </button>
+        <div className="order-form-actions">
+          <button type="button" onClick={onCancel} className="button-secondary">
+            Cancel
+          </button>
+          <button type="submit" className="button-primary" disabled={mutation.isPending}>
+            {mutation.isPending ? 'Placing order…' : 'Place order'}
+          </button>
+        </div>
       </form>
-    </section>
+    </>
   );
 }

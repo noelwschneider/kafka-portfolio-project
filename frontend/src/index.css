@@ -11,6 +11,8 @@
   --failure-bg: #fbe9ea;
   --pending: #a06a00;
   --pending-bg: #fdf3dd;
+  --expected: #2f74b8;
+  --expected-bg: #e6f0fa;
 
   font: 15px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
   color-scheme: light dark;
@@ -28,6 +30,8 @@
     --success-bg: #103a22;
     --failure-bg: #3a1418;
     --pending-bg: #3a2c05;
+    --expected: #6fb3f0;
+    --expected-bg: #122c42;
   }
 }
 
@@ -42,24 +46,7 @@ body {
 .app {
   max-width: 1000px;
   margin: 0 auto;
-  padding: 0 24px 48px;
-}
-
-.app-title-link {
-  text-decoration: none;
-}
-
-.app-header h1 {
-  cursor: pointer;
-  font-size: 24px;
-  margin: 24px 0 0;
-  color: var(--text-h);
-}
-
-.app-subtitle {
-  color: var(--text);
-  opacity: 0.7;
-  margin: 4px 0 16px;
+  padding: 24px 24px 48px;
 }
 
 .app-nav {
@@ -165,6 +152,14 @@ td {
   background: var(--failure-bg);
 }
 
+/* Designed/expected outcome — a legitimate business result (e.g. REJECTED_OUT_OF_STOCK,
+   PAYMENT_FAILED), or a benign "not reported yet" state — as opposed to an actual fault. Kept
+   visually distinct from both status-pending (in-progress) and status-failure (a real problem). */
+.status-expected {
+  color: var(--expected);
+  background: var(--expected-bg);
+}
+
 .order-form {
   display: flex;
   flex-direction: column;
@@ -184,8 +179,17 @@ td {
   padding: 8px;
   border-radius: 6px;
   border: 1px solid var(--border);
-  background: var(--bg);
+  background: var(--bg-alt);
   color: var(--text-h);
+}
+
+.inventory-table {
+  margin-bottom: 4px;
+}
+
+.inventory-table td,
+.inventory-table th {
+  padding: 6px 10px;
 }
 
 .line-items {
@@ -196,19 +200,32 @@ td {
 
 .line-item {
   display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-.line-item select {
+.line-item-name {
   flex: 1;
 }
 
 .line-item input {
   width: 80px;
+  background: var(--bg-alt);
 }
 
 .error {
   color: var(--failure);
+}
+
+.input-invalid {
+  border-color: var(--failure);
+  outline: 1px solid var(--failure);
+}
+
+.field-error {
+  color: var(--failure);
+  font-size: 0.8em;
+  align-self: center;
 }
 
 .order-summary-card {
@@ -252,25 +269,9 @@ td {
   font-size: 13px;
 }
 
-.overview-hero {
-  margin-bottom: 24px;
-}
-
-.overview-lede {
-  max-width: 720px;
-  line-height: 1.6;
-}
-
 .status-table {
   max-width: 480px;
   margin-bottom: 8px;
-}
-
-.quick-scenarios {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
 }
 
 .badge {
@@ -296,11 +297,20 @@ td {
 
 .scenario-card {
   border: 1px solid var(--border);
+  border-top: 3px solid var(--accent);
   border-radius: 8px;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  background: var(--bg-alt);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.scenario-card:hover {
+  box-shadow: 0 4px 12px rgba(91, 61, 240, 0.16);
+  transform: translateY(-1px);
 }
 
 .scenario-card-header {
@@ -310,21 +320,38 @@ td {
   gap: 8px;
 }
 
-.scenario-card h2 {
+.scenario-card h3 {
   font-size: 16px;
   margin: 0;
+  color: var(--text-h);
 }
 
-.scenario-card ul {
+.scenario-card-description {
   margin: 0;
-  padding-left: 18px;
-  font-size: 13px;
   opacity: 0.85;
 }
 
 .scenario-card button {
   margin-top: auto;
   align-self: flex-start;
+}
+
+.button-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.button-primary:hover:not(:disabled) {
+  background: #4c31d6;
+  border-color: #4c31d6;
+}
+
+.button-primary:disabled {
+  background: var(--bg-alt);
+  border-color: var(--border);
+  color: var(--text);
 }
 
 .stream-indicator {
@@ -373,16 +400,11 @@ td {
 
 .timeline-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
-  padding: 8px 12px;
-  cursor: pointer;
+  padding: 10px 12px;
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
   font-size: 13px;
-}
-
-.timeline-row:hover {
-  background: var(--bg-alt);
 }
 
 .timeline-time {
@@ -426,6 +448,91 @@ td {
 
 .timeline-detail-row {
   display: contents;
+}
+
+/* Scenario run detail page: staged reveal + narrative headline as the primary text. These are
+   new classes scoped to ScenarioRunDetailPage.tsx's own JSX — the shared .timeline/.timeline-entry
+   rules above are unchanged so OrderDetailPage.tsx's rendering is unaffected. */
+.timeline-reveal {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.timeline-revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.timeline-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.timeline-title {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.timeline-headline {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  opacity: 0.85;
+}
+
+.timeline-raw {
+  display: flex;
+  gap: 10px;
+  opacity: 0.55;
+  font-size: 11px;
+}
+
+.timeline-demonstrates {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.timeline-demonstrates li {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--expected-bg);
+  color: var(--expected);
+  border: 1px solid var(--border);
+}
+
+.scenario-context {
+  margin: 8px 0 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-alt);
+}
+
+.scenario-context-description {
+  margin: 0 0 8px;
+}
+
+.scenario-context-demonstrates-framing {
+  margin: 0 0 8px;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.scenario-context-expected {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.85;
 }
 
 .not-wired-banner {
@@ -509,4 +616,117 @@ td {
 
 .architecture-page table {
   margin-bottom: 16px;
+}
+
+.orders-table th {
+  padding: 0;
+}
+
+.sort-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text-h);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sort-header:hover {
+  background: var(--bg-alt);
+  border-color: transparent;
+}
+
+.sort-arrow {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.order-id-cell {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 13px;
+}
+
+.order-total-cell {
+  font-variant-numeric: tabular-nums;
+}
+
+.empty-state {
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 32px 16px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.empty-state p {
+  margin: 0;
+  opacity: 0.75;
+}
+
+.order-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.button-secondary {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.button-secondary:hover:not(:disabled) {
+  background: var(--bg-alt);
+  border-color: var(--border);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 24px;
+  z-index: 10;
+}
+
+.modal {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  width: 100%;
+  max-width: 520px;
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.modal-header h2 {
+  margin: 0;
+}
+
+.modal-close {
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  padding: 4px 8px;
 }

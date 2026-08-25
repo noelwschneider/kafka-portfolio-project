@@ -1,13 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { OverviewPage } from './pages/OverviewPage';
 import { OrdersListPage } from './pages/OrdersListPage';
-import { CreateOrderPage } from './pages/CreateOrderPage';
 import { OrderDetailPage } from './pages/OrderDetailPage';
-import { ScenariosPage } from './pages/ScenariosPage';
 import { ScenarioRunDetailPage } from './pages/ScenarioRunDetailPage';
-import { EventExplorerPage } from './pages/EventExplorerPage';
-import { SystemHealthPage } from './pages/SystemHealthPage';
 import { ArchitecturePage } from './pages/ArchitecturePage';
 
 // This is a demo/ops console, not a resilient consumer app — when a backend is down we want that
@@ -30,28 +26,25 @@ const queryClient = new QueryClient({
 const NAV_ITEMS = [
   { to: '/', label: 'Overview', end: true },
   { to: '/orders', label: 'Orders' },
-  { to: '/scenarios', label: 'Scenarios' },
-  { to: '/events', label: 'Event Explorer' },
-  { to: '/health', label: 'System Health' },
   { to: '/architecture', label: 'Architecture' },
 ];
 
+// New Order is an inline modal panel on OrdersListPage rather than a routed page (issue #7). The
+// `/orders/new` route is kept only as a deep link that lands on Orders with the panel pre-opened —
+// closing the panel (cancel or a successful create) drops the "/new" suffix so the URL reflects
+// the panel's actual state.
 function OrdersListRoute() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isCreateRoute = location.pathname === '/orders/new';
   return (
     <OrdersListPage
       onSelectOrder={(orderId) => navigate(`/orders/${orderId}`)}
-      onCreateOrder={() => navigate('/orders/new')}
-    />
-  );
-}
-
-function CreateOrderRoute() {
-  const navigate = useNavigate();
-  return (
-    <CreateOrderPage
       onOrderCreated={(orderId) => navigate(`/orders/${orderId}`)}
-      onCancel={() => navigate('/orders')}
+      initialCreateOpen={isCreateRoute}
+      onCreateClosed={() => {
+        if (isCreateRoute) navigate('/orders', { replace: true });
+      }}
     />
   );
 }
@@ -62,10 +55,6 @@ function App() {
       <BrowserRouter>
         <div className="app">
           <header className="app-header">
-            <NavLink to="/" className="app-title-link">
-              <h1>Order Fulfillment Systems Lab</h1>
-            </NavLink>
-            <p className="app-subtitle">Event-driven Spring Boot / Kafka demonstration console</p>
             <nav className="app-nav">
               {NAV_ITEMS.map((item) => (
                 <NavLink
@@ -84,12 +73,12 @@ function App() {
             <Routes>
               <Route path="/" element={<OverviewPage />} />
               <Route path="/orders" element={<OrdersListRoute />} />
-              <Route path="/orders/new" element={<CreateOrderRoute />} />
+              <Route path="/orders/new" element={<OrdersListRoute />} />
               <Route path="/orders/:orderId" element={<OrderDetailRoute />} />
-              <Route path="/scenarios" element={<ScenariosPage />} />
+              <Route path="/scenarios" element={<Navigate to="/" replace />} />
               <Route path="/scenario-runs/:runId" element={<ScenarioRunDetailRoute />} />
-              <Route path="/events" element={<EventExplorerPage />} />
-              <Route path="/health" element={<SystemHealthPage />} />
+              <Route path="/events" element={<Navigate to="/" replace />} />
+              <Route path="/health" element={<Navigate to="/" replace />} />
               <Route path="/architecture" element={<ArchitecturePage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

@@ -79,19 +79,31 @@ a planned item turns out to need, may jump the queue. It takes the same delegate
 Routine "while I'm in here" additions are not covered by this and still wait for the next planning
 cycle, however small they seem.
 
-### Plan and open
+### Plan
 
-A sprint opens before any of its work is delegated. Report paths, the board's `Sprint` field, and the
-current-sprint pointer in `docs/planning/README.md` all resolve against the open sprint, so delegating
-into a sprint that has not been opened files its output against the previous one.
+Planning is a working conversation, and the plan doc and the board are written *during* it, not after
+some separate approval — the doc and the board are the record, live and reviewable throughout, rather
+than a decision held in conversation until a sign-off message. This runs inline in the current
+session rather than a forked subagent, because an extended back-and-forth is the point and a fork
+can't carry that across turns.
 
 Sprint scope and rationale stay in `docs/planning/sprint-N/sprint-N-plan.md`; live status stays on the
-GitHub Project board. Each sprint additionally carries a **model and effort tier assignment** for its
-work. That assignment no longer needs to be rewritten per sprint: the presets carry the default tiers,
-and a sprint plan only records deviations.
+GitHub Project board. Re-invoking planning mid-sprint, when scope changes, reconciles against what's
+already there rather than re-proposing from scratch — read the existing plan doc and board state
+first, and only change what's actually being revisited.
 
-Effort must be set explicitly or it reverts to High. Preset frontmatter sets it, which is why the
-tiering now survives a sprint boundary.
+Each sprint additionally carries a **model and effort tier assignment** for its work. That assignment
+no longer needs to be rewritten per sprint: the presets carry the default tiers, and a sprint plan only
+records deviations. Effort must be set explicitly or it reverts to High. Preset frontmatter sets it,
+which is why the tiering now survives a sprint boundary.
+
+### Open
+
+Opening is narrow on purpose: flip the current-sprint pointer in `docs/planning/README.md`, confirm
+the plan doc and the board actually agree, and give the explicit signal that delegation can now target
+this sprint. Report paths and "which sprint is current" both resolve from that pointer, so it has to
+flip once, deliberately — everything else about a sprint can be built up gradually during planning,
+but this one action can't drift in the same way without misfiling work against the wrong sprint.
 
 ### Delegate
 

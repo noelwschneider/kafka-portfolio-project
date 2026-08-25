@@ -6,8 +6,9 @@ How a sprint runs, and what you do at each stage. Commands are listed in
 
 ## The short version
 
-1. **`/sprint-plan`** — you get a proposed slate. Discuss it, adjust it, approve it.
-2. **`/sprint-open`** — the sprint gets set up. You skim the result.
+1. **`/sprint-plan`** — a working conversation. What lands gets written to the plan doc and the
+   board as you go, not held for a final approval.
+2. **`/sprint-open`** — flips the switch. Confirms the doc and board agree, then delegation can start.
 3. **For each task** — you write a brief and name a preset. It works in the background. You review the
    diff and commit.
 4. **`/sprint-close`** — the board is reconciled against what actually happened.
@@ -30,29 +31,33 @@ sprint command does this, and each states which sprint it is acting on up front 
 caught before it does anything. Pass a number explicitly to override.
 
 Preferences are a first-class input — theme, size, "I want the TLS work in this one," "keep it small,
-I'm travelling." Say them up front and the slate is built around them.
+I'm travelling." Say them up front and the recommendation is built around them.
 
-**You get back:** a proposed slate — each item with what it unblocks, the theme they hold together on,
-time-critical items called out separately even when they aren't recommended, and strong candidates
-left out with what would earn them a place.
+**This is a conversation, and it writes as it goes.** You'll get a recommendation first — what's in,
+why, what it unblocks, what's time-critical even if left out, what's coherent about it. Push back, ask
+for a different cut. As specifics get settled — an item confirmed in, a theme agreed — they land in
+`docs/planning/sprint-N/sprint-N-plan.md` and on the board immediately, not held until some final
+approval. The doc and the board are the record the whole time; there's no separate sign-off moment.
+Planning is done whenever you're satisfied, not when a particular message gets sent.
 
-**This is a conversation.** Push back, ask why something was omitted, ask for a different cut. Nothing
-is written and the board is untouched until you approve the slate. Planning ends when you sign off,
-not when the proposal arrives.
+Re-running `/sprint-plan` later — to keep planning, or to re-plan mid-sprint when scope changes — reads
+what's already there first and reconciles, rather than starting over.
 
 ## Open
 
-**You run:** `/sprint-open`, after signing off.
+**You run:** `/sprint-open`, once planning has settled.
 
-**What happens:** the plan doc is created under `docs/planning/sprint-N/` from the slate you approved; `docs/planning/README.md` is updated so agents know which sprint is current; the board
-gets a `Sprint 4` option, its Current Sprint view is re-filtered, the slate's items move to `Planned`,
-and scheduled drafts become real Issues so commits can reference them.
+**What happens:** the plan doc and board are already there from planning — this step checks they
+actually agree with each other, flips the current-sprint pointer in `docs/planning/README.md`,
+re-filters the Current Sprint view, and confirms in-scope items are `Planned` rather than still sitting
+in `Backlog`.
 
-**Your involvement:** skim the plan doc. It's the narrative record of what you agreed to, and it's
-easier to fix now than to reconstruct later.
+**Your involvement:** little — this is deliberately the thin, mechanical step. If it flags a mismatch
+between the plan doc and the board, that's the one thing worth your attention here.
 
-**This must happen before any of the sprint's work is delegated.** Report paths and board fields
-resolve against the open sprint — delegate first and the output files against the previous one.
+**This must happen before any of the sprint's work is delegated.** Report paths and "which sprint is
+current" both resolve from the pointer this flips — delegate first and the output files against the
+previous sprint.
 
 ## Delegate, verify, land
 
@@ -124,7 +129,9 @@ invoke them all deliberately.
 
 Two out-of-order uses are worth doing on purpose:
 
-- **`/sprint-plan` mid-sprint** re-plans when scope changes. It's read-only; it never touches the board.
+- **`/sprint-plan` mid-sprint** re-plans when scope changes. It reads what's already on the
+  board and in the plan doc first and reconciles against that, rather than re-proposing from
+  scratch — safe to invoke repeatedly for exactly that reason.
 - **`/sprint-review` mid-sprint** fixes workflow friction the moment you notice it. Waiting for a
   boundary to fix something that's annoying you now defeats the point of the stage.
 

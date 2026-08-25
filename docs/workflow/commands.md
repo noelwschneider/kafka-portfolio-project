@@ -6,8 +6,8 @@ Reference for the workflow in `user-guide.md`.
 
 | Command | What it does | When |
 |---|---|---|
-| `/sprint-plan` | Reviews the backlog and proposes a candidate slate with reasoning (Sonnet/high) | Starting sprint planning |
-| `/sprint-open` | Creates the plan doc, updates the index, sets up the board (Sonnet/medium) | Once the slate is settled |
+| `/sprint-plan` | Plans a sprint with you, writing the plan doc and board live as decisions land (Sonnet/high) | Starting, continuing, or re-planning a sprint |
+| `/sprint-open` | Flips the current-sprint pointer and confirms doc/board agree (Sonnet/medium) | Once planning has settled |
 | `/sprint-close` | Reconciles the board and corrects the record (Sonnet/high) | Sprint goals complete |
 | `/sprint-review` | Captures backlog items, routes process gaps, refines the workflow (Sonnet/high) | After close, before planning next |
 | `/tier` | Picks model and effort - for a subagent, or for the current session | Before delegating, or when unsure the session is tiered right |

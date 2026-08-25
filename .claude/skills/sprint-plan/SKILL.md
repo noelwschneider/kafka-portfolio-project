@@ -1,23 +1,23 @@
 ---
 name: sprint-plan
-description: Review the project backlog and propose a candidate slate for the next sprint, with reasoning. Use at the start of sprint planning, before the sprint is opened.
+description: Plan a sprint - decide its scope with the developer and write it down as it's decided, both the plan doc and the board. Use to start sprint planning, to continue an in-progress one, or to re-plan mid-sprint when scope changes.
 argument-hint: [optional sprint number; any constraint such as size or theme]
-context: fork
-background: false
 model: sonnet
 effort: high
-allowed-tools: Bash(gh project *), Bash(gh issue *), Bash(git log *), Bash(ls *)
+allowed-tools: Write, Edit, Bash(gh project *), Bash(gh issue *), Bash(gh api *), Bash(git log *), Bash(ls *)
 disable-model-invocation: true
 ---
 
-# Proposing a sprint slate
+# Planning a sprint
 
-You are reviewing the backlog and recommending what the next sprint should contain. You are not
-committing to anything — the developer decides. Your job is to make that decision easy by surfacing
-the right candidates with honest reasoning.
+You are having a working conversation with the developer about what the next sprint should contain,
+and writing the result down as you go — the plan doc and the board — rather than holding the decision
+in conversation until some later approval step. There is no separate sign-off: the doc and the board
+*are* the record, live and reviewable the whole time. Planning is done whenever the developer is
+satisfied enough to run `/sprint-open`, not when a particular message gets sent.
 
-Read-only. Never modify the board or any planning doc from this skill, whenever it is run — it is
-safe to invoke mid-sprint to re-plan when scope changes.
+This runs in your current session, not a forked subagent — an extended back-and-forth is the point,
+and a fork can't carry that across turns the way this conversation can.
 
 ## Which sprint
 
@@ -27,19 +27,40 @@ Work it out; do not ask. The sprint directories on disk are the source of truth:
 ls -d docs/planning/sprint-*/ 2>/dev/null | sed 's|.*sprint-||;s|/||' | sort -n | tail -1
 ```
 
-That is the latest documented sprint. You are planning **the next one**, so add 1.
+That is the latest **documented** sprint — but the board can be ahead of the docs (a decision made
+and written to the board before this skill's doc-writing habit existed, or before this particular
+session got the chance). Check both signals for the candidate number (latest + 1):
+
+```bash
+gh project item-list 7 --owner noelwschneider --format json
+```
+
+If `docs/planning/sprint-N/sprint-N-plan.md` exists **or** the board already has items tagged
+`Sprint N`, you're continuing or reconciling an already-started sprint — go to "Re-entering a plan
+already in progress" below before doing anything else, even if the doc itself is missing. Only start
+fresh at latest + 1 when neither signal has anything for it.
 
 An explicit number in the arguments overrides this. State which sprint you are acting on in your first
-response so a wrong inference is caught immediately rather than after the work is done.
+response so a wrong inference is caught immediately.
+
+## Re-entering a plan already in progress
+
+Read `docs/planning/sprint-N/sprint-N-plan.md` and the board's current items for that sprint before
+saying anything. Treat what's already there as settled unless the developer is explicitly revisiting
+it — don't re-propose from scratch and don't silently discard a prior decision.
+
+When something does change, update the doc and the board to the new, correct state. Don't narrate the
+change inside the doc itself (no "previously this said X" — see the documentation rule); state the
+change to the developer in conversation, and let the doc just be right.
 
 ## Start with the developer's own preferences
 
 Anything they said about this sprint — a theme, a size, specific items they want in or out, "keep it
-small this time" — is the strongest input you have. Build the slate around it and say where a
-preference conflicts with a criterion below, rather than quietly overriding either.
+small this time" — is the strongest input you have. Build around it and say where a preference
+conflicts with a criterion below, rather than quietly overriding either.
 
-If they gave no preferences, ask whether they have any before doing the full review. It is cheaper
-than proposing a slate against the wrong constraints.
+If they gave no preferences and this is a fresh sprint, ask before doing the full review — cheaper
+than proposing against the wrong constraints.
 
 ## Read the current state
 
@@ -67,26 +88,37 @@ Read the previous sprint's plan under `docs/planning/sprint-N/` for what was def
 Tier 1 outranks Tier 2 at equal benefit. `Shelved` items stay shelved unless something has changed
 that you can name.
 
-## What to produce
+## Write and update as each decision is reached
 
-- **A recommended slate**, each item with: what it is, why it earns a place, what it unblocks, and a
-  rough sense of size relative to the others.
-- **The theme** the slate holds together on, in a sentence. If the slate has no coherent theme, say so
-  rather than inventing one.
-- **Time-critical items**, called out separately, including any you are not recommending for this
-  sprint — with what happens if they keep waiting.
-- **Dependencies within the slate**, and anything that must be sequenced.
-- **Strong candidates you left out**, briefly, and what would earn them a place next time.
-- **Open questions** that need a decision before the sprint can be opened.
+Don't hold a mental slate and dump it at the end. As soon as something is actually decided:
+
+- **Update `docs/planning/sprint-N/sprint-N-plan.md`** to the current, correct state — input, theme,
+  goals, sequencing, dependencies, definition of done — following the shape of the previous sprint's
+  plan. Create the file as soon as there's real content for it (even just a theme and one goal), and
+  keep it accurate as more gets decided. State current content only; this is a plan doc, not a log.
+- **Update the board to match**, using the `board` skill for the mechanics: convert a draft to a real
+  Issue once it's genuinely scheduled into this sprint, set `Status: Planned` and `Priority`, set
+  `Sprint` (add the option first if this sprint doesn't have one yet — see the `board` skill). When an
+  Initiative turns out to have several genuinely separable deliverables, decompose it into native
+  GitHub sub-issues now, per `engineering-rules.md`'s Initiative/Task policy — that's a planning-time
+  judgment call, not something to defer. Run the `board` skill's duplicate-check and worthiness-check
+  for anything new.
+
+Scope should stay thematically coherent — items that don't share the sprint's theme wait for one that
+matches them, unless they're urgent enough for the narrow exception in `engineering-rules.md`.
 
 Do not size the sprint to a fixed capacity — this project deliberately has no fixed iteration length.
-If the slate looks large or small, say so and let the developer decide.
+If it looks large or small, say so and let the developer decide.
 
-## Getting to sign-off
+## Talking it through
 
-The first slate is a proposal, not an answer. Expect to revise it — a different cut, a different size,
-a candidate reconsidered. Ask directly whether the slate is approved and treat anything short of a
-clear yes as still open.
+Present a full recommendation before writing anything on a fresh sprint — what's in, why, what it
+unblocks, what's time-critical even if left out, what's coherent about it, strong candidates left out
+and why. Once the developer is engaging with specifics rather than the shape of the whole thing,
+that's the signal to start writing decisions down as they land, not to wait for one final approval.
 
-Nothing is written until they approve. When they do, `/sprint-open` is the next step and it is theirs
-to run.
+If effort feels like it's degrading over a long planning conversation, re-invoke `/sprint-plan` to
+refresh the tier for your next turn, or use `/effort high` directly.
+
+When the developer is satisfied, tell them the plan doc and board are ready and that `/sprint-open` is
+next — theirs to run.

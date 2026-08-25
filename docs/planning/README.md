@@ -43,7 +43,7 @@ the system as it was planned pre-implementation, not a living spec. Prefer the f
 | [`sprint-2/pre-sprint-planning.md`](sprint-2/pre-sprint-planning.md) | The post-MVP brainstorm and prioritized backlog Sprint 2's scope was chosen from |
 | [`sprint-2/sprint-2-plan.md`](sprint-2/sprint-2-plan.md) | Sprint 2's goals, scope, parallelization plan, and the planning docs it needed |
 
-### `sprint-3/` — current sprint
+### `sprint-3/` — developer knowledge and workflow (complete)
 
 Theme: the developer's own knowledge and workflow, not the application. See
 [`sprint-3/sprint-3-plan.md`](sprint-3/sprint-3-plan.md) for the full plan.
@@ -54,6 +54,17 @@ Theme: the developer's own knowledge and workflow, not the application. See
 | [`sprint-3/orchestration-retrospective.md`](sprint-3/orchestration-retrospective.md) | How this project's agentic work has actually been orchestrated across Sprint 1–2 — required reading for the Workflow Refinement agent |
 | [`sprint-3/workflow-agent-briefing.md`](sprint-3/workflow-agent-briefing.md) | Standalone briefing for the Agentic Workflow Refinement agent session |
 | [`sprint-3/study-guide-agent-briefing.md`](sprint-3/study-guide-agent-briefing.md) | Standalone briefing for the Study Guide agent session |
+
+### `sprint-4/` — frontend polish (closed; two items carried to backlog)
+
+Theme: a visual/UX pass across the React frontend, the prerequisite for the README demo recording
+(itself out of scope for this sprint). Closed with the Orders table's row-clickability/formatting
+and per-column filtering unscheduled and returned to the backlog; everything else shipped. See
+[`sprint-4/sprint-4-plan.md`](sprint-4/sprint-4-plan.md) for the full plan and closing state.
+
+| File | What's in it |
+|---|---|
+| [`sprint-4/sprint-4-plan.md`](sprint-4/sprint-4-plan.md) | This sprint's goals, sequencing, and closing state |
 
 ## Cross-reference note
 

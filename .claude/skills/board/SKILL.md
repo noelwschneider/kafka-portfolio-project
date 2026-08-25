@@ -19,14 +19,58 @@ rationale. Do not duplicate rationale into board items, and do not track live st
 |---|---|---|
 | Status | `PVTSSF_lAHOB38DIc4BhEqTzhgB0vE` | Backlog `f75ad846`, Planned `9935e4cd`, In Progress `47fc9ee4`, Done `98236657` |
 | Priority | `PVTSSF_lAHOB38DIc4BhEqTzhgB9Dw` | Tier 1 `81a17eaa`, Tier 2 `97537018`, Shelved `7c38e779` |
-| Sprint | `PVTSSF_lAHOB38DIc4BhEqTzhgB9D0` | Sprint 2 `e3cf966f`, Sprint 3 `f8e19f28` |
+| Sprint | `PVTSSF_lAHOB38DIc4BhEqTzhgB9D0` | Sprint 2 `97a0e823`, Sprint 3 `e4a85fe9`, Sprint 4 `ae9c5ee9` |
 
-Option ids change if a field is edited. Re-read them rather than trusting this table when a write
-fails:
+This table can still drift stale if the field is edited by hand (GitHub's UI, or a mutation that
+omits existing ids) — re-read before trusting it whenever a write fails:
 
 ```bash
 gh project field-list 7 --owner noelwschneider --format json
 ```
+
+## Adding a new Sprint value
+
+Needed once per sprint, the first time anything gets tagged with a sprint that doesn't exist yet as
+an option. `gh project field-create` only creates whole new fields — adding an option to an existing
+single-select field needs a GraphQL mutation, and the mutation replaces the *entire* option list. Pass
+every existing option's `id` through **unchanged** alongside the new one (which gets no `id`, since it
+doesn't exist yet) — verified live: doing this preserves every existing id exactly, so this is safe to
+run without re-tagging anything afterward. Omitting an existing id is what regenerates it.
+
+Fetch current options first:
+
+```bash
+gh api graphql -f query='
+query {
+  user(login: "noelwschneider") {
+    projectV2(number: 7) {
+      field(name: "Sprint") {
+        ... on ProjectV2SingleSelectField { id options { id name color description } }
+      }
+    }
+  }
+}'
+```
+
+Then add the new one, keeping every existing option's `id` field exactly as returned:
+
+```bash
+gh api graphql -f query='
+mutation {
+  updateProjectV2Field(input: {
+    fieldId: "PVTSSF_lAHOB38DIc4BhEqTzhgB9D0"
+    singleSelectOptions: [
+      { id: "97a0e823", name: "Sprint 2", color: GRAY, description: "" }
+      { id: "e4a85fe9", name: "Sprint 3", color: GRAY, description: "" }
+      { id: "ae9c5ee9", name: "Sprint 4", color: GRAY, description: "" }
+      { name: "Sprint 5", color: GRAY, description: "" }
+    ]
+  }) { projectV2Field { ... on ProjectV2SingleSelectField { options { id name } } } }
+}'
+```
+
+The response echoes back every option's id — confirm the existing ones match what you sent before
+trusting them for a subsequent write.
 
 ## Common operations
 

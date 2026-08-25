@@ -1,74 +1,10 @@
 import { MermaidDiagram } from '../components/MermaidDiagram';
 
-// frontend-design.md §12.7. Diagram source and prose below are transcribed from
-// docs/architecture-diagram.md so a reviewer gets the same picture here as in the repo's own docs,
-// rendered rather than left as a link. Keep the two in sync when either changes (Phase 11 polish
-// pass found this page had drifted badly out of date behind Phases 7-10 and ADR-009 — check both
-// files together from now on).
-const SYSTEM_OVERVIEW_DIAGRAM = `flowchart TB
-    UI["React / TypeScript console<br/>Vite + TanStack Query + EventSource"]
-
-    subgraph services["Backend services (Spring Boot, Java 21)"]
-        ORD["Order Service<br/>owns order lifecycle status"]
-        INV["Inventory Service<br/>owns stock, reservations"]
-        PAY["Payment Service<br/>simulator, no real provider"]
-        FUL["Fulfillment Service<br/>owns shipments"]
-        SCN["Scenario Service<br/>demo control plane only"]
-    end
-
-    subgraph kafka["Apache Kafka (KRaft)"]
-        T_ORD["orders.events"]
-        T_INV["inventory.events"]
-        T_PAY["payments.events"]
-        T_FUL["fulfillment.events"]
-        T_DLQ["orders.dlq / inventory.dlq<br/>payments.dlq / fulfillment.dlq"]
-    end
-
-    subgraph pg["PostgreSQL — one schema per service"]
-        S_ORD["order_service"]
-        S_INV["inventory_service"]
-        S_PAY["payment_service"]
-        S_FUL["fulfillment_service"]
-        S_SCN["scenario_service"]
-    end
-
-    UI -->|"REST /api"| ORD
-    UI -->|"REST /api"| INV
-    UI -->|"REST /demo"| SCN
-    UI -->|"SSE order-status-changed"| ORD
-    UI -->|"SSE timeline-entry"| SCN
-
-    SCN -->|"POST /api/orders"| ORD
-    SCN -->|"/demo payment behavior"| PAY
-    SCN -->|"/demo pause + resume"| INV
-    SCN -->|"/demo pause + resume"| FUL
-
-    ORD -->|"publish OrderCreated,<br/>PaymentRequested"| T_ORD
-    T_ORD -->|"consume"| INV
-    T_ORD -->|"consume"| PAY
-
-    INV -->|"publish InventoryReserved,<br/>InventoryReservationFailed,<br/>InventoryReleased"| T_INV
-    T_INV -->|"consume"| ORD
-
-    PAY -->|"publish PaymentAuthorized,<br/>PaymentRejected"| T_PAY
-    T_PAY -->|"consume"| ORD
-    T_PAY -->|"consume"| FUL
-    T_PAY -->|"consume PaymentRejected<br/>to release stock"| INV
-
-    FUL -->|"publish ShipmentCreated"| T_FUL
-    T_FUL -->|"consume"| ORD
-
-    SCN -->|"duplicate + poison records"| T_ORD
-    INV -.->|"retries exhausted"| T_DLQ
-    PAY -.->|"retries exhausted"| T_DLQ
-    FUL -.->|"retries exhausted"| T_DLQ
-
-    ORD --- S_ORD
-    INV --- S_INV
-    PAY --- S_PAY
-    FUL --- S_FUL
-    SCN --- S_SCN
-`;
+// frontend-design.md §12.7. This page keeps only the happy-path sequence diagram as an
+// at-a-glance illustration and links out to the repo's own architecture docs for full detail,
+// rather than duplicating them here — a duplicated system-overview diagram on this page drifted
+// badly out of sync with docs/architecture-diagram.md behind Phases 7-10 and ADR-009.
+const REPO_BASE = 'https://github.com/noelwschneider/kafka-portfolio-project/blob/main';
 
 const HAPPY_PATH_DIAGRAM = `sequenceDiagram
     autonumber
@@ -118,11 +54,37 @@ export function ArchitecturePage() {
       </div>
 
       <h2>System overview</h2>
-      <MermaidDiagram source={SYSTEM_OVERVIEW_DIAGRAM} />
+      <p>
+        Five services — Order, Inventory, Payment, Fulfillment, and the Scenario demo control
+        plane — talk to each other only through Kafka, never directly. Each owns exactly one
+        PostgreSQL schema, with no shared tables and no cross-schema reads. The full diagram, with
+        every topic, schema, and REST/SSE edge, lives in the repo:
+      </p>
       <ul>
-        <li>No arrow between two business services — Order, Inventory, Payment, and Fulfillment communicate only through Kafka (ADR-002).</li>
-        <li>Each service touches exactly one PostgreSQL schema. No shared tables, no cross-schema reads (ADR-004).</li>
-        <li>A service publishes only to its own topic — e.g. <code>PaymentRequested</code> sits on <code>orders.events</code> because Order Service publishes it.</li>
+        <li>
+          <a href={`${REPO_BASE}/docs/architecture-diagram.md`} target="_blank" rel="noreferrer">
+            docs/architecture-diagram.md
+          </a>{' '}
+          — the full system diagram plus failure-path sequence diagrams
+        </li>
+        <li>
+          <a href={`${REPO_BASE}/docs/adr/ADR-002-separate-demo-and-business-apis.md`} target="_blank" rel="noreferrer">
+            ADR-002
+          </a>{' '}
+          — why business services never call each other directly, only through Kafka
+        </li>
+        <li>
+          <a href={`${REPO_BASE}/docs/adr/ADR-004-postgresql-per-service-ownership-boundaries.md`} target="_blank" rel="noreferrer">
+            ADR-004
+          </a>{' '}
+          — why each service owns exactly one PostgreSQL schema
+        </li>
+        <li>
+          <a href={`${REPO_BASE}/docs/adr`} target="_blank" rel="noreferrer">
+            docs/adr/
+          </a>{' '}
+          — all architecture decision records
+        </li>
       </ul>
 
       <h2>Happy path — order reaches FULFILLED</h2>
@@ -287,13 +249,34 @@ export function ArchitecturePage() {
 
       <h2>Repository documentation</h2>
       <ul>
-        <li><code>docs/architecture-diagram.md</code> — the diagrams above, plus failure-path sequence diagrams</li>
-        <li><code>docs/scenarios.md</code> — the eight demo scenarios in full</li>
-        <li><code>docs/events/event-catalog.md</code> — event envelope, topics, publisher/consumer map</li>
-        <li><code>docs/order-state-machine.md</code> — order status transitions</li>
-        <li><code>docs/db-ownership.md</code> — per-service schema ownership</li>
-        <li><code>docs/adr/</code> — architecture decision records (ADR-001 through ADR-009)</li>
-        <li><code>docs/reliability-pattern.md</code> — idempotency/retry/DLQ implementation detail</li>
+        <li>
+          <a href={`${REPO_BASE}/docs/architecture-diagram.md`} target="_blank" rel="noreferrer">docs/architecture-diagram.md</a>{' '}
+          — the system-overview diagram, plus failure-path sequence diagrams
+        </li>
+        <li>
+          <a href={`${REPO_BASE}/docs/scenarios.md`} target="_blank" rel="noreferrer">docs/scenarios.md</a>{' '}
+          — the eight demo scenarios in full
+        </li>
+        <li>
+          <a href={`${REPO_BASE}/docs/events/event-catalog.md`} target="_blank" rel="noreferrer">docs/events/event-catalog.md</a>{' '}
+          — event envelope, topics, publisher/consumer map
+        </li>
+        <li>
+          <a href={`${REPO_BASE}/docs/order-state-machine.md`} target="_blank" rel="noreferrer">docs/order-state-machine.md</a>{' '}
+          — order status transitions
+        </li>
+        <li>
+          <a href={`${REPO_BASE}/docs/db-ownership.md`} target="_blank" rel="noreferrer">docs/db-ownership.md</a>{' '}
+          — per-service schema ownership
+        </li>
+        <li>
+          <a href={`${REPO_BASE}/docs/adr`} target="_blank" rel="noreferrer">docs/adr/</a>{' '}
+          — architecture decision records (ADR-001 through ADR-011)
+        </li>
+        <li>
+          <a href={`${REPO_BASE}/docs/reliability-pattern.md`} target="_blank" rel="noreferrer">docs/reliability-pattern.md</a>{' '}
+          — idempotency/retry/DLQ implementation detail
+        </li>
       </ul>
     </section>
   );

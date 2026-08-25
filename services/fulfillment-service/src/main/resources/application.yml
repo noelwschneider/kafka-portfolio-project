@@ -70,6 +70,9 @@ management:
     health:
       probes:
         enabled: true
+      # Frontend Overview page reads the kafka/db components from this response (Sprint 4 #16) —
+      # without this, /actuator/health returns only the top-level status, no components map at all.
+      show-components: always
   health:
     livenessstate:
       enabled: true

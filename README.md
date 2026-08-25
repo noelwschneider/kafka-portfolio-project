@@ -56,9 +56,10 @@ Then open the frontend:
 
 **http://localhost:5173**
 
-That's the lab's UI — an Overview page showing live service health, an Orders view, a Scenarios
-page for triggering the reproducible failure/reliability demos, and an Event Explorer for watching
-the Kafka events those scenarios actually produce (real requests and real events, not an animation).
+That's the lab's UI — an Overview page showing live service health plus the reproducible
+failure/reliability demo scenarios, an Orders view with a per-order event timeline for watching the
+Kafka events those scenarios actually produce (real requests and real events, not an animation), and
+an Architecture page.
 
 ### Metrics dashboards (Grafana)
 
