@@ -77,8 +77,12 @@ trusting them for a subsequent write.
 List items, with their item ids:
 
 ```bash
-gh project item-list 7 --owner noelwschneider --format json
+gh project item-list 7 --owner noelwschneider --limit 200 --format json
 ```
+
+**The default limit is 30 and silently truncates — it returned an incomplete list against this real
+board once already.** The JSON has a `totalCount` field; if `len(items) < totalCount`, the limit was
+too low and the list is incomplete. Raise `--limit` and re-run rather than trusting a partial list, especially before a duplicate-check.
 
 Add a backlog entry as a draft item:
 
@@ -93,13 +97,18 @@ gh project item-edit --project-id PVT_kwHOB38DIc4BhEqT --id <item-id> \
   --field-id <field-id> --single-select-option-id <option-id>
 ```
 
+When editing several items in one pass, fetch each item's id fresh (`gh project item-list`) in the
+same command/script that uses it, rather than reusing an id copy-pasted from an earlier tool call's
+output. Two different issues can look alike at a glance across a long session, and a mismatched id
+silently edits the wrong item with no error — this has actually happened.
+
 ## Before creating anything: check for an existing item
 
 List the full backlog and read titles *and bodies* for overlap — not just exact title matches. A
 gap phrased differently from an existing item is still the same item.
 
 ```bash
-gh project item-list 7 --owner noelwschneider --format json
+gh project item-list 7 --owner noelwschneider --limit 200 --format json
 ```
 
 - **Same scope as an existing item:** do not create a duplicate. Report that it already exists and

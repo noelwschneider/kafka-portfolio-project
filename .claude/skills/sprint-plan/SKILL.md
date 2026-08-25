@@ -32,7 +32,7 @@ and written to the board before this skill's doc-writing habit existed, or befor
 session got the chance). Check both signals for the candidate number (latest + 1):
 
 ```bash
-gh project item-list 7 --owner noelwschneider --format json
+gh project item-list 7 --owner noelwschneider --limit 200 --format json
 ```
 
 If `docs/planning/sprint-N/sprint-N-plan.md` exists **or** the board already has items tagged
@@ -65,7 +65,7 @@ than proposing against the wrong constraints.
 ## Read the current state
 
 ```bash
-gh project item-list 7 --owner noelwschneider --format json
+gh project item-list 7 --owner noelwschneider --limit 200 --format json
 ```
 
 Read the previous sprint's plan under `docs/planning/sprint-N/` for what was deferred and why, and

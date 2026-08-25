@@ -59,7 +59,16 @@ Check the previous sprint's close and review notes. Anything identified as a pro
 already have been fixed at review time, in the durable place — a preset, a rule, a hook, or a skill.
 If something was flagged but never actually fixed, fix it now rather than let it carry a second time.
 
-## 4. Give the go-ahead
+## 4. Start delegating
 
-Tell the developer the sprint is open — delegation can now target it, and reports will file to the
-right place. This is the actual signal this whole skill exists to produce.
+If step 0's checks all passed clean — no drift between plan doc and board, previous sprint actually
+closed — don't stop to ask whether to proceed. The developer runs this command immediately after
+finishing `/sprint-plan`, specifically to kick off work in the same breath; treat a clean validation
+as the go-ahead to begin delegating the sprint's first task(s) right away, per the plan's sequencing
+and `docs/workflow/agent-workflow.md`.
+
+Only pause for developer input if step 0 actually surfaced something wrong (drift, an unclosed
+previous sprint, a stub plan doc) — that's the case worth stopping for, not a clean validation.
+
+Tell the developer the sprint is open and name what you've just kicked off (or are about to) — this
+is the actual signal this whole skill exists to produce.

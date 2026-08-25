@@ -66,6 +66,16 @@ and per-column filtering unscheduled and returned to the backlog; everything els
 |---|---|
 | [`sprint-4/sprint-4-plan.md`](sprint-4/sprint-4-plan.md) | This sprint's goals, sequencing, and closing state |
 
+### `sprint-5/` — backend correctness and reliability (current)
+
+Theme: whether the system's core delivery guarantees actually hold, and closing the gap between the
+project's Day-1 CI decision and what exists today — a deliberate pivot from Sprint 4's frontend focus.
+See [`sprint-5/sprint-5-plan.md`](sprint-5/sprint-5-plan.md) for the full plan.
+
+| File | What's in it |
+|---|---|
+| [`sprint-5/sprint-5-plan.md`](sprint-5/sprint-5-plan.md) | This sprint's goals, sequencing, and scope |
+
 ## Cross-reference note
 
 Files reference each other by filename + section title (e.g. "backend-design.md's PostgreSQL Data

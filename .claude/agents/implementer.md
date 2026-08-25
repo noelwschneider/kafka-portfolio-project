@@ -38,6 +38,22 @@ need it for your report.
 Prefer `docker compose` over `kind` unless the change touches the Kubernetes API specifically. It
 exercises the same application paths at a fraction of the startup cost.
 
+**Rebuild only what your change touches.** `docker compose up --build -d` (every service) is
+frequently run concurrently by parallel delegations sharing one host — Sprint 4 lost `kafka`,
+`inventory-service`, and `scenario-service` to OOM kills when three agents each did a full-stack
+rebuild at once. If your change is frontend-only, `docker compose up --build -d frontend` (or a
+local `vite build`/`vite preview` against whatever backend is already running on its usual host
+ports) exercises the same code path at a fraction of the memory. Reserve a full-stack rebuild for
+changes that actually touch multiple services or their wiring.
+
+**No browser tool does not mean no visual verification.** If a UI change needs eyes on a rendered
+page and no browser/screenshot tool is available in your environment, install one:
+`npx playwright install` plus a short throwaway script driven via Bash is a real, already-proven
+path (delete the script when done; don't leave it as dead scaffolding). Falling back to build
+success and bundle-content grep is real evidence of what shipped, but it is not the same as looking
+at the page — prefer actually looking when the ticket is about how something looks or behaves
+interactively.
+
 ## Stay inside your scope
 
 Implement what was asked. If you find an adjacent problem, record it under `## Deliberately not

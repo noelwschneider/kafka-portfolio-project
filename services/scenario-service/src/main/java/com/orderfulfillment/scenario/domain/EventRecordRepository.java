@@ -14,7 +14,7 @@ public interface EventRecordRepository extends JpaRepository<EventRecordEntity, 
 
     boolean existsByEventIdAndAggregateId(UUID eventId, String aggregateId);
 
-    boolean existsByTopicAndPartitionAndOffset(String topic, int partition, long offset);
+    boolean existsByTopicAndPartitionAndOffsetAndEventId(String topic, int partition, long offset, UUID eventId);
 
     @Query("""
             select e from EventRecordEntity e

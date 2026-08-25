@@ -35,7 +35,7 @@ response so a wrong inference is caught immediately rather than after the work i
 List the sprint's items and check each against what actually landed:
 
 ```bash
-gh project item-list 7 --owner noelwschneider --format json
+gh project item-list 7 --owner noelwschneider --limit 200 --format json
 ```
 
 - Everything finished moves to `Done`.

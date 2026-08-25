@@ -105,19 +105,27 @@ public class EventProjectionConsumer {
                     record.topic(), record.partition(), record.offset(), e.getMessage());
             return;
         }
-        // Idempotent by (topic, partition, offset), which uniquely identifies this physical Kafka
-        // record: at-least-once delivery (event-catalog.md §2) can genuinely redeliver it — a
-        // rebalance, a retry after a transient DB error — and re-projecting it must be a safe no-op
-        // rather than a constraint-violation crash loop.
-        if (eventRecordRepository.existsByTopicAndPartitionAndOffset(record.topic(), record.partition(), record.offset())) {
-            log.debug("Already projected {}-{}@{}, skipping redelivery", record.topic(), record.partition(),
-                    record.offset());
+        // Idempotent by (topic, partition, offset, eventId), not by physical coordinates alone:
+        // at-least-once delivery (event-catalog.md §2) can genuinely redeliver the same physical
+        // record — a rebalance, a retry after a transient DB error — and re-projecting it must be a
+        // safe no-op rather than a constraint-violation crash loop, which is what the physical
+        // coordinates alone are for. But (topic, partition, offset) is only a stable identity within
+        // one broker epoch: a local stack rebuild against a non-persistent Kafka (or a genuine topic
+        // recreation) resets offsets to 0, and dedupe-by-coordinates-only then collides a genuinely
+        // new record against a stale row left over from before the reset and silently drops it
+        // (sprint-5 issue #27). Requiring the eventId to also match is what tells apart "the same
+        // physical record, redelivered" (same tuple, safe no-op) from "a new record that happens to
+        // reuse an old physical address" (same coordinates, different eventId, must be projected).
+        // Deduping on eventId alone was tried and rejected: docs/scenarios.md's Scenario 4 (a frozen
+        // contract) deliberately republishes a record with the same eventId at a genuinely new
+        // offset and requires the timeline to show it twice — an eventId-only key would swallow that
+        // legitimate second delivery. See V3__events_dedupe_by_topic_partition_offset_and_event_id.sql.
+        if (eventRecordRepository.existsByTopicAndPartitionAndOffsetAndEventId(
+                record.topic(), record.partition(), record.offset(), envelope.eventId())) {
+            log.debug("Already projected {}-{}@{} eventId={}, skipping redelivery", record.topic(),
+                    record.partition(), record.offset(), envelope.eventId());
             return;
         }
-        // A DLQ record shares the original event's eventId with the record that was dead-lettered;
-        // it is still projected as its own row because it is a distinct Kafka record with its own
-        // topic/partition/offset — hence the UNIQUE constraint on (topic, partition, offset), not on
-        // event_id, in V2__events.sql.
         String producer = PRODUCER_BY_TOPIC.getOrDefault(record.topic(), "unknown");
         Map<String, Object> payloadMap = toMap(envelope.payload());
         EventRecordEntity entity = new EventRecordEntity(

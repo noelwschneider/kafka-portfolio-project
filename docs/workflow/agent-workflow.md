@@ -190,7 +190,20 @@ work instead of a recurring half hour.
 concurrent subagents landing conflicting changes in one tree — a failure this project has already hit.
 It is not enabled by default because a worktree is a fresh checkout: `docker compose` verification
 needs the gitignored environment files carried in via a `.worktreeinclude`, and that path is unproven
-here. Worth doing before the next round of genuinely parallel implementation work.
+here. Still unresolved as of Sprint 4, which ran genuinely parallel delegations by having the
+orchestrating session reason manually about file overlap before choosing to parallelize or sequence —
+that worked without a single landed conflict across ~20 delegations, so isolation is not urgently
+blocking. What Sprint 4 actually broke was different: three agents each running a full-stack
+`docker compose up --build -d` at the same time OOM-killed `kafka`, `inventory-service`, and
+`scenario-service` on the shared host. Worktree isolation would not have prevented that — separate
+worktrees running separate full stacks would have made memory pressure worse, not better. The
+immediate mitigation landed in the `implementer` preset instead: rebuild only the service(s) a change
+actually touches, not the whole stack, when other delegations may be running concurrently.
+
+**Resource-scoped rebuilds vs. worktree isolation aren't the same problem.** Worktree isolation is
+about two agents editing the same file; the OOM incident was about N agents sharing one host's finite
+memory regardless of whether their file edits ever collided. Both are real; only the second one has
+actually caused damage so far.
 
 **`permissionMode: acceptEdits` for `implementer`.** Would remove most permission interruptions from
 background delegations. Left at the default because it widens what an unattended agent can do without

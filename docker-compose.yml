@@ -24,6 +24,17 @@ services:
     container_name: orderfulfillment-kafka
     ports:
       - "9092:9092"
+    volumes:
+      # Matches postgres's persistent-volume treatment: without this, every `docker compose up
+      # --build` recreates the container with an empty log dir, resetting every topic's offsets to
+      # 0. Scenario Service's event projection dedupes on physical Kafka coordinates plus eventId
+      # (see services/scenario-service's V3__events_dedupe_by_topic_partition_offset_and_event_id.sql
+      # for why that's also being fixed at the schema level) — an offset reset made old low-offset
+      # rows collide with freshly-produced records at the same offset and get silently dropped as
+      # "already projected". This volume keeps local rebuilds from causing that in the first place;
+      # the schema fix in scenario-service is the defense for when a reset happens anyway (topic
+      # deletion, a genuinely fresh environment).
+      - orderfulfillment-kafka-data:/tmp/kraft-combined-logs
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -237,3 +248,4 @@ services:
 
 volumes:
   orderfulfillment-postgres-data:
+  orderfulfillment-kafka-data:

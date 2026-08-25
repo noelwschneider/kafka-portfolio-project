@@ -1,0 +1,158 @@
+# W35 — actually run the project's tests on push/PR, per-service, instead of only building images.
+#
+# build-images.yml (workflow_dispatch only) publishes container images for manual deploys; it never
+# runs a test. This workflow is the other half: it runs `mvn test` for whichever backend module(s)
+# a change touches, plus lint+build for the frontend, on every push and pull request. It does not
+# build or publish any image, and it does not touch deployment — that split is intentional, not an
+# oversight (see build-images.yml's own header for why deployment stays manual).
+#
+# Path filtering: the five backend services are independent Maven modules under services/*, but all
+# five declare a direct dependency on services/common (see each service's pom.xml <dependency>
+# section), so a change to common can break any of them silently if common's own job is the only one
+# that reruns. Each service job below is therefore gated on either that service's own paths or
+# services/common's, and the common module is compiled with `-am` (also-make) so a change scoped to
+# one service still resolves against a freshly built common jar rather than whatever happens to be in
+# the local ~/.m2 cache.
+#
+# Frontend: package.json today defines "lint" (oxlint) and "build" (tsc -b && vite build) but no
+# "test" script — there are no automated frontend tests yet (tracked separately as issue #34). Running
+# lint+build is what actually exists to run; adding a test framework is out of scope here.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same branch/PR so path-filtered jobs don't pile up across force-pushes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      common: ${{ steps.filter.outputs.common }}
+      order: ${{ steps.filter.outputs.order }}
+      inventory: ${{ steps.filter.outputs.inventory }}
+      payment: ${{ steps.filter.outputs.payment }}
+      fulfillment: ${{ steps.filter.outputs.fulfillment }}
+      scenario: ${{ steps.filter.outputs.scenario }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            # A change to the root pom (module list, shared dependencyManagement) or to
+            # services/common potentially affects every backend service, so it fans out to all five.
+            common:
+              - 'pom.xml'
+              - 'services/common/**'
+            order:
+              - 'services/order-service/**'
+            inventory:
+              - 'services/inventory-service/**'
+            payment:
+              - 'services/payment-service/**'
+            fulfillment:
+              - 'services/fulfillment-service/**'
+            scenario:
+              - 'services/scenario-service/**'
+            frontend:
+              - 'frontend/**'
+
+  order-service:
+    needs: changes
+    if: needs.changes.outputs.order == 'true' || needs.changes.outputs.common == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      # Testcontainers spins up real Postgres/Kafka containers per test class; ubuntu-latest runners
+      # ship Docker preinstalled, so no extra setup step is needed for that.
+      - name: Test order-service (and common)
+        run: mvn -B -pl services/common,services/order-service -am test
+
+  inventory-service:
+    needs: changes
+    if: needs.changes.outputs.inventory == 'true' || needs.changes.outputs.common == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Test inventory-service (and common)
+        run: mvn -B -pl services/common,services/inventory-service -am test
+
+  payment-service:
+    needs: changes
+    if: needs.changes.outputs.payment == 'true' || needs.changes.outputs.common == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Test payment-service (and common)
+        run: mvn -B -pl services/common,services/payment-service -am test
+
+  fulfillment-service:
+    needs: changes
+    if: needs.changes.outputs.fulfillment == 'true' || needs.changes.outputs.common == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Test fulfillment-service (and common)
+        run: mvn -B -pl services/common,services/fulfillment-service -am test
+
+  scenario-service:
+    needs: changes
+    if: needs.changes.outputs.scenario == 'true' || needs.changes.outputs.common == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Test scenario-service (and common)
+        run: mvn -B -pl services/common,services/scenario-service -am test
+
+  frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
