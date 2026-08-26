@@ -206,6 +206,14 @@ Spring Boot's Kafka auto-configuration applies a single `CommonErrorHandler` bea
 container factory, so this one bean covers every listener in the service without any of them naming
 it. The only per-service input is the DLQ topic.
 
+This applies to every `@KafkaListener` in the system, not only the four domain services' own
+business-transaction consumers: Scenario Service's `EventProjectionConsumer` (its
+`scenario-service-projection` consumer group, consuming all four domain topics and all four DLQs for
+the Event Explorer projection) is wired the same way, via `ScenarioKafkaReliabilityConfig` and its own
+`scenario.dlq`. A `@KafkaListener` with no corresponding `*KafkaReliabilityConfig` bean silently falls
+back to Spring Kafka's own framework default (`FixedBackOff(0, 9)`, no classification, no DLQ) instead
+of this policy — checklist item 6 below exists specifically so that never happens again.
+
 ### 4.2 What the factory builds
 
 - **`DeadLetterPublishingRecoverer`** with a fixed destination resolver

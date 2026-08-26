@@ -75,6 +75,7 @@ Service consumer would have to filter out its own output.
 | `fulfillment.events` | Fulfillment Service | `ShipmentCreated` |
 | `demo.events` | Scenario Service | Scenario-run lifecycle records used to build the run timeline. Not domain events; no entry in §3. |
 | `orders.dlq`, `inventory.dlq`, `payments.dlq`, `fulfillment.dlq` | the failing **consumer** | Records that exhausted retries, plus failure metadata. Routing targets, not domain event types. |
+| `scenario.dlq` | Scenario Service | Records `EventProjectionConsumer`'s own projection (`scenario-service-projection` consumer group) failed to process, plus failure metadata. Same routing-target rule as the four domain DLQs: the failure belongs to this consumer, not to whichever domain service published the record it choked on. |
 
 **Record key = `aggregateId` = `orderId`** on every topic. This gives per-order ordering within a
 partition, which is the property the workflow actually depends on (an order's `InventoryReserved`

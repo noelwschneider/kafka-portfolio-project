@@ -60,4 +60,12 @@ public class KafkaTopicConfig {
     public NewTopic fulfillmentDlqTopic() {
         return TopicBuilder.name(KafkaTopics.FULFILLMENT_DLQ).partitions(PARTITIONS).replicas(REPLICATION_FACTOR).build();
     }
+
+    // Scenario Service's own DLQ (issue #41) — see KafkaTopics.SCENARIO_DLQ's javadoc. Declared here
+    // rather than only in scenario-service so every service that pulls in services/common agrees on
+    // its shape, matching the four domain DLQs above.
+    @Bean
+    public NewTopic scenarioDlqTopic() {
+        return TopicBuilder.name(KafkaTopics.SCENARIO_DLQ).partitions(PARTITIONS).replicas(REPLICATION_FACTOR).build();
+    }
 }

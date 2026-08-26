@@ -13,6 +13,34 @@ Newest first. Each entry states what changed, why, who is affected, and what the
 
 ---
 
+## 2026-08-26 — `event-catalog.md`: new `scenario.dlq` topic
+
+**Changed by:** Sprint 7, issue #41 (retry-classification bug in `ConsumerErrorHandlerFactory`).
+
+**What changed.** `docs/events/event-catalog.md` §2's topic table gains a `scenario.dlq` row,
+published by Scenario Service. `KafkaTopics.SCENARIO_DLQ` and a matching `NewTopic` bean are added
+in `services/common` alongside the four existing `<domain>.dlq` constants/beans.
+
+**Why.** Root-causing issue #41 found that Scenario Service's `EventProjectionConsumer` — a genuine
+Kafka consumer in its own consumer group, `scenario-service-projection` — had never been wired to
+`ConsumerErrorHandlerFactory` at all. No other service's `*KafkaReliabilityConfig` covers it, and
+`ConsumerErrorHandlerFactory.create(...)` requires a destination DLQ topic to build its
+`DeadLetterPublishingRecoverer`, so there was no existing topic this consumer's own failures could
+correctly dead-letter to: routing them to one of the four domain DLQs would misattribute the failure
+to a domain service that did nothing wrong (`docs/events/event-catalog.md` §2's existing rule: "the
+failing consumer" owns the DLQ). `scenario.dlq` gives it its own, following the same rule.
+
+**Who is affected.**
+
+- **Scenario Service** — implemented: new `ScenarioKafkaReliabilityConfig` wires
+  `ConsumerErrorHandlerFactory.create(KafkaTopics.SCENARIO_DLQ)`, which Spring Boot's Kafka
+  auto-configuration applies to both of `EventProjectionConsumer`'s listeners.
+- **services/common** — implemented: `KafkaTopics.SCENARIO_DLQ` and `KafkaTopicConfig#scenarioDlqTopic`.
+- **Everyone else** — no action. No event payload, existing topic, or API shape changed; this is an
+  additive DLQ topic for a consumer that previously had no dead-letter destination at all.
+
+---
+
 ## 2026-08-26 — `order-service.yaml`: new read-only `GET /api/prices`
 
 **Changed by:** Sprint 6, issue #32 (New Order form's inventory table has no price column).
