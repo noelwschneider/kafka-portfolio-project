@@ -21,11 +21,15 @@ public class InventoryServiceClient {
         this.client = inventoryServiceRestClient;
     }
 
-    public void restoreInventory(String sku, int seedAvailableQuantity) {
-        client.post()
+    /** @return the real HTTP status code, so a caller that records this call on a run timeline can
+     *          report what actually happened instead of asserting success. */
+    public int restoreInventory(String sku, int seedAvailableQuantity) {
+        return client.post()
                 .uri("/demo/inventory/{sku}/restore", sku)
                 .body(Map.of("availableQuantity", seedAvailableQuantity))
                 .retrieve()
-                .toBodilessEntity();
+                .toBodilessEntity()
+                .getStatusCode()
+                .value();
     }
 }

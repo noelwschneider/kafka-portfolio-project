@@ -32,6 +32,11 @@ class HighVolumeScenarioIntegrationTest extends AbstractIntegrationTest {
     @Test
     void burstOfOrdersReachesFulfilledAndRecordsThroughputAndLag() {
         PAYMENT_SERVICE.stubFor(put(urlPathEqualTo("/demo/payment-behavior")).willReturn(aResponse().withStatus(200)));
+        // The scenario restores its burst SKU to seed stock before submitting (HighVolumeScenario's
+        // restoreBurstSkuToSeed) — without it, repeated runs against a real Inventory Service run the
+        // SKU down and fail on out-of-stock rather than on anything this scenario is demonstrating.
+        INVENTORY_SERVICE.stubFor(post(urlPathEqualTo("/demo/inventory/SKU-003/restore"))
+                .willReturn(aResponse().withStatus(200)));
 
         stubSequentialOrderCreation();
         ORDER_IDS.forEach(id -> ORDER_SERVICE.stubFor(get(urlPathEqualTo("/api/orders/" + id))

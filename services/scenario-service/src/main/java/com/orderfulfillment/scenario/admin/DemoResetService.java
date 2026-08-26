@@ -1,6 +1,7 @@
 package com.orderfulfillment.scenario.admin;
 
 import com.orderfulfillment.common.ConflictException;
+import com.orderfulfillment.scenario.catalog.SeedInventory;
 import com.orderfulfillment.scenario.clients.ConsumerControlClient;
 import com.orderfulfillment.scenario.clients.InventoryServiceClient;
 import com.orderfulfillment.scenario.clients.PaymentServiceClient;
@@ -9,7 +10,6 @@ import com.orderfulfillment.scenario.domain.ScenarioRunStatus;
 import com.orderfulfillment.scenario.dto.ResetResultDto;
 import com.orderfulfillment.scenario.runtime.RunRegistry;
 import java.time.Instant;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -35,16 +35,6 @@ import org.springframework.stereotype.Service;
 public class DemoResetService {
 
     private static final Logger log = LoggerFactory.getLogger(DemoResetService.class);
-
-    /** docs/planning/sprint-1/backend-design.md's Seed Data section / docs/db-ownership.md's price table. */
-    private static final Map<String, Integer> SEED_QUANTITIES = new LinkedHashMap<>();
-
-    static {
-        SEED_QUANTITIES.put("SKU-001", 10);
-        SEED_QUANTITIES.put("SKU-002", 5);
-        SEED_QUANTITIES.put("SKU-003", 100);
-        SEED_QUANTITIES.put("SKU-004", 2);
-    }
 
     private final ScenarioRunRepository runRepository;
     private final RunRegistry runRegistry;
@@ -78,7 +68,7 @@ public class DemoResetService {
 
     private boolean restoreInventory() {
         boolean allOk = true;
-        for (Map.Entry<String, Integer> entry : SEED_QUANTITIES.entrySet()) {
+        for (Map.Entry<String, Integer> entry : SeedInventory.quantities().entrySet()) {
             try {
                 inventoryServiceClient.restoreInventory(entry.getKey(), entry.getValue());
             } catch (Exception e) {
