@@ -63,6 +63,11 @@ export interface OrderPage {
   totalPages: number;
 }
 
+export interface SkuPrice {
+  sku: string;
+  unitPrice: number;
+}
+
 export function createOrder(request: CreateOrderRequest): Promise<OrderAccepted> {
   return apiFetch<OrderAccepted>(ORDER_SERVICE_BASE_URL, '/api/orders', {
     method: 'POST',
@@ -76,4 +81,11 @@ export function listOrders(): Promise<OrderPage> {
 
 export function getOrder(orderId: string): Promise<OrderDetail> {
   return apiFetch<OrderDetail>(ORDER_SERVICE_BASE_URL, `/api/orders/${orderId}`);
+}
+
+// GET /api/prices (issue #32) — read-only exposure of the same seeded SKU price map Order Service
+// applies to OrderItem.unitPrice at order creation. Used to show a price on the New Order form
+// before an item is added; never used to price an order client-side.
+export function listPrices(): Promise<SkuPrice[]> {
+  return apiFetch<SkuPrice[]>(ORDER_SERVICE_BASE_URL, '/api/prices');
 }

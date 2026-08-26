@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createOrder, type CreateOrderItem } from '../api/orders';
+import { createOrder, listPrices, type CreateOrderItem } from '../api/orders';
 import { listInventory } from '../api/inventory';
 import { ApiRequestError } from '../api/client';
 import { LoadingHint } from '../components/LoadingHint';
@@ -23,6 +23,14 @@ export function CreateOrderPage({ onOrderCreated, onCancel }: Props) {
     queryKey: ['inventory'],
     queryFn: listInventory,
   });
+  // Read-only price lookup (issue #32) — GET /api/prices, Order Service's own seeded SKU price
+  // map exposed for display only. Not used to price the order itself: that still happens
+  // server-side at order creation from the same catalog.
+  const { data: prices } = useQuery({
+    queryKey: ['prices'],
+    queryFn: listPrices,
+  });
+  const priceBySku = new Map((prices ?? []).map((p) => [p.sku, p.unitPrice]));
 
   const [customerId, setCustomerId] = useState('demo-customer');
   // Order lines the customer has actually picked, added one at a time from the inventory table
@@ -108,16 +116,15 @@ export function CreateOrderPage({ onOrderCreated, onCancel }: Props) {
 
         {inventory && inventory.length > 0 && (
           // Real inventory presented as a scannable table (issue #22) rather than dropdown option
-          // text. No price column: InventoryItem (docs/openapi/inventory-service.yaml) carries no
-          // price field, and unitPrice on an order line is captured server-side by the Order
-          // Service from its own seeded SKU price map at order-creation time — never fetched from
-          // Inventory Service (docs/openapi/order-service.yaml, OrderItem.unitPrice) — so there is
-          // no real price to show here without fabricating one.
+          // text. Price column (issue #32) reads GET /api/prices — Order Service's own seeded SKU
+          // price map, the same one it applies to OrderItem.unitPrice at order-creation time — not
+          // Inventory Service, which carries no price field.
           <table className="inventory-table">
             <thead>
               <tr>
                 <th>Product</th>
                 <th>SKU</th>
+                <th>Price</th>
                 <th>Available</th>
                 <th></th>
               </tr>
@@ -125,10 +132,12 @@ export function CreateOrderPage({ onOrderCreated, onCancel }: Props) {
             <tbody>
               {inventory.map((item) => {
                 const free = item.availableQuantity - item.reservedQuantity;
+                const price = priceBySku.get(item.sku);
                 return (
                   <tr key={item.sku}>
                     <td>{item.displayName}</td>
                     <td className="order-id-cell">{item.sku}</td>
+                    <td>{price !== undefined ? `$${price.toFixed(2)}` : '—'}</td>
                     <td>{free}</td>
                     <td>
                       <button type="button" onClick={() => addSkuToOrder(item.sku)} disabled={free <= 0}>

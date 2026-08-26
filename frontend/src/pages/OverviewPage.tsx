@@ -1,6 +1,7 @@
+import { Fragment, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { fetchAllServiceHealth, type ServiceHealth } from '../api/health';
+import { fetchAllServiceHealth, type ActuatorComponent, type ServiceHealth } from '../api/health';
 import { listScenarios, runScenario, type ScenarioName } from '../api/scenarios';
 import { ApiRequestError } from '../api/client';
 import { LoadingHint } from '../components/LoadingHint';
@@ -56,9 +57,41 @@ function infraClass(state: string): string {
   return 'status status-failure';
 }
 
+function componentClass(status: string): string {
+  if (status === 'UP') return 'status status-success';
+  return 'status status-failure';
+}
+
+// Renders every key in `health.raw.components`, not just the ones the top-level Kafka/PostgreSQL
+// rows happen to derive from — so a component neither of those rows surfaces (diskSpace, ssl,
+// livenessState, readinessState, ping, ...) is still visible somewhere once a service's row is
+// expanded.
+function ServiceComponentDetail({ health }: { health: ServiceHealth | undefined }) {
+  const components = health?.raw?.components;
+  if (!health) {
+    return <p className="hint">Still checking this service…</p>;
+  }
+  if (!components || Object.keys(components).length === 0) {
+    return <p className="hint">No component-level detail reported by this service.</p>;
+  }
+  return (
+    <dl className="health-component-detail">
+      {Object.entries(components).map(([key, component]: [string, ActuatorComponent]) => (
+        <div key={key} className="health-component-row">
+          <dt>{key}</dt>
+          <dd>
+            <span className={componentClass(component.status)}>{component.status}</span>
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 export function OverviewPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [expandedService, setExpandedService] = useState<string | null>(null);
 
   const { data: healths, isLoading: healthsLoading } = useQuery({
     queryKey: ['overview-health'],
@@ -95,13 +128,34 @@ export function OverviewPage() {
           {['Order Service', 'Inventory Service', 'Payment Service', 'Fulfillment Service', 'Scenario Service'].map(
             (name) => {
               const health = healthByName.get(name);
+              const isExpanded = expandedService === name;
               return (
-                <tr key={name}>
-                  <td>{name}</td>
-                  <td>
-                    <span className={stateClass(health)}>{stateLabel(health)}</span>
-                  </td>
-                </tr>
+                <Fragment key={name}>
+                  <tr>
+                    <td>
+                      <button
+                        type="button"
+                        className="disclosure-toggle"
+                        onClick={() => setExpandedService(isExpanded ? null : name)}
+                        aria-expanded={isExpanded}
+                        title={isExpanded ? 'Hide component detail' : 'Show component detail'}
+                      >
+                        <span className={`disclosure-triangle${isExpanded ? ' disclosure-open' : ''}`}>▶</span>
+                        {name}
+                      </button>
+                    </td>
+                    <td>
+                      <span className={stateClass(health)}>{stateLabel(health)}</span>
+                    </td>
+                  </tr>
+                  {isExpanded && (
+                    <tr className="health-detail-row">
+                      <td colSpan={2}>
+                        <ServiceComponentDetail health={health} />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               );
             },
           )}

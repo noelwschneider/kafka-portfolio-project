@@ -26,6 +26,14 @@ const COLUMNS: { key: SortKey; label: string }[] = [
   { key: 'createdAt', label: 'Created' },
 ];
 
+// Compact "Aug 26, 2:14 PM" formatting for the Created column — no year, no seconds.
+const createdAtFormatter = new Intl.DateTimeFormat(undefined, {
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+});
+
 function sortOrders(orders: OrderSummary[], key: SortKey, dir: SortDir): OrderSummary[] {
   const sorted = [...orders].sort((a, b) => {
     const av = a[key];
@@ -125,8 +133,13 @@ export function OrdersListPage({ onSelectOrder, onOrderCreated, initialCreateOpe
                 <td>
                   <StatusBadge status={order.status} />
                 </td>
-                <td className="order-total-cell">${order.totalAmount.toFixed(2)}</td>
-                <td>{new Date(order.createdAt).toLocaleString()}</td>
+                <td className="order-total-cell">
+                  <span className="order-total-value">
+                    <span className="order-total-currency">$</span>
+                    <span className="order-total-amount">{order.totalAmount.toFixed(2)}</span>
+                  </span>
+                </td>
+                <td>{createdAtFormatter.format(new Date(order.createdAt))}</td>
               </tr>
             ))}
           </tbody>
