@@ -13,6 +13,38 @@ Newest first. Each entry states what changed, why, who is affected, and what the
 
 ---
 
+## 2026-08-25 — `db-ownership.md`: Scenario Service `events` table dedupe key extended to include `event_id`
+
+**Changed by:** Sprint 5, issue #27 (Event projection dedup key not stable across Kafka broker reset).
+
+**What changed.** The `events` table's constraint changes from `UNIQUE (topic, partition, offset)` to
+`UNIQUE (topic, partition, offset, event_id)`. The physical-coordinate tuple stays in the constraint —
+it is still what distinguishes a DLQ record from the domain record it was dead-lettered from, since
+both legitimately share one `event_id`. `event_id` is added alongside it, not substituted for it.
+Migration: `services/scenario-service/src/main/resources/db/migration/V3__events_dedupe_by_topic_partition_offset_and_event_id.sql`.
+
+**Why.** `docker-compose.yml`'s `kafka` service had no persistent volume, so a local stack rebuild
+reset every topic's offsets to 0. A record produced after that reset could land at a `(topic,
+partition, offset)` a stale pre-reset row already occupied, and the old constraint alone made that
+read as an already-projected duplicate — silently dropping it. This broke the duplicate-event demo
+scenario intermittently and emptied Order Detail's event timeline for affected orders. Adding
+`event_id` to the constraint means a reset-induced coincidence on the physical tuple no longer reads
+as a duplicate; a genuine duplicate (same `event_id`, same physical position) still is one.
+`docker-compose.yml`'s `kafka` service also gained a persistent volume as a first line of defense, so
+this reset stops happening on an ordinary local rebuild in the first place.
+
+**Who is affected.**
+
+- **Scenario Service** — implemented. `EventProjectionConsumer` and `EventRecordRepository` updated
+  to dedupe on the new composite key.
+- **Everyone else** — no action. No event payload, topic, or API shape changed; this is Scenario
+  Service's own read-model projection, not a domain event contract. Confirmed separately (issue #29)
+  that Order/Inventory/Payment/Fulfillment's own idempotency ledgers never shared this table's
+  physical-coordinate-only pattern — they already key on `(event_id, consumer_name)` and needed no
+  change.
+
+---
+
 ## 2026-08-21 — `adr/ADR-005`, `adr/ADR-009`, `reliability-pattern.md`: retention added for `processed_events` and `deferred_transitions`
 
 **Changed by:** Sprint 2 goal 2, item 4 (Correctness & Reliability Cleanup).

@@ -94,3 +94,54 @@ No new design docs (backend/frontend/high-level) or execution-plan.md — this s
 fixes existing behavior rather than introducing new contracts or architecture. Per-item work should
 delegate to the `investigator` preset for #29 and #28 (diagnosis-first), and the `implementer` preset
 for #27 (once scoped) and #35, per `docs/workflow/agent-workflow.md`.
+
+## Closing state
+
+All four goals shipped and are independently verified against a running stack, not just accepted on
+the implementing agent's own report.
+
+- **#29** — confirmed the real domain services (Order, Inventory, Payment, Fulfillment) do not share
+  EventProjectionConsumer's broker-reset-fragile pattern. All four key their idempotency ledgers on
+  `(eventId, consumerName)` via the shared `services/common` `ProcessedEventKey`, never on physical
+  Kafka coordinates — confirmed by file:line audit of every `processed_events` migration and every
+  domain consumer, plus a live replay test. This scoped #27's fix to Scenario Service only.
+- **#27** — fixed with two changes: a persistent volume for the `kafka` service in `docker-compose.yml`
+  mounted at `/var/lib/kafka/data` with `KAFKA_LOG_DIRS` set to match (the image's own default log path
+  of `/tmp/kraft-combined-logs` turned out not to be where this image's `KafkaDockerWrapper` actually
+  writes without that env var, and isn't writable by the broker's uid without it either — both found
+  and fixed in a second pass after independent verification caught the first attempt's volume silently
+  not persisting anything); and a new Flyway migration changing the scenario-service events table's
+  dedupe constraint from `(topic, partition, offset)` to a composite
+  `(topic, partition, offset, event_id)` — not `eventId` alone, which was tried and found to violate
+  the frozen Duplicate Event Delivery scenario contract (`docs/scenarios.md` Scenario 4 deliberately
+  republishes the same `eventId` at a new offset and requires both rows to appear). Verified
+  independently: reproduced the original offset-collision failure, confirmed the schema fix closes it
+  under repeated real broker resets, confirmed Scenario 4's legitimate duplicate still persists as two
+  rows, and confirmed a real `docker compose down`/`up --build` cycle now preserves Kafka's topic
+  offsets rather than resetting them. `docs/db-ownership.md`'s frozen `events` table constraint and
+  `docs/CHANGELOG-contracts.md` are updated to match — the implementing agent changed the constraint
+  without following the coordination protocol on the first pass; caught and fixed at sprint review,
+  which also hardened `.claude/hooks/require-agent-report.py` so a migration touching a documented
+  table can no longer land without an explicit answer in the report.
+- **#28** — root-caused as a known, already-accepted design gap, not a new defect: Inventory Service
+  never consumes `ShipmentCreated` (or any fulfillment-side event), so nothing on the success path ever
+  releases a reservation; the compensation-side release (triggered by `PaymentRejected`) works
+  correctly and was confirmed via a positive-control scenario run. The `reserved_quantity <=
+  available_quantity` invariant holds throughout. Closing this for real means the "Option B"
+  saga-behavior fix (still unscheduled, see Explicitly not in scope) — there is no smaller defect
+  underneath.
+- **#35** — `.github/workflows/ci.yml` added: one path-filtered Maven test job per backend service
+  (gated on that service's own paths or `services/common`, since all five depend on it directly), plus
+  a frontend lint+build job. Separate from the existing image-build workflow, which is untouched.
+  Verified independently against the real Maven/npm commands, `actionlint`, and each service's actual
+  `pom.xml` dependency declarations.
+
+One new finding surfaced during #27's verification, not part of this sprint's original scope: the
+Duplicate Event Delivery scenario's run *timeline* doesn't display its second event entry, because
+`RunRegistry.finish()` clears the correlation-to-run mapping before the async republish is consumed.
+The underlying events project correctly (confirmed via direct query); only the timeline display is
+affected. This confirms and extends an existing backlog draft item rather than being new — updated in
+place on the board — and remains unscheduled.
+
+`README.md`'s CI/CD section, previously stating no workflow ran tests on push/PR, is updated to
+reflect `ci.yml`'s existence.

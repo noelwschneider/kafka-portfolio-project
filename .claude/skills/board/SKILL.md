@@ -1,7 +1,7 @@
 ---
 name: board
 description: Add to or update the GitHub Project board - create backlog items, move status, set priority and sprint, convert drafts to real issues, and log unplanned work. Use whenever work is identified, started, or finished.
-argument-hint: [what to add or change]
+argument-hint: what to add or change
 allowed-tools: Bash(gh project *), Bash(gh issue *), Bash(gh api *)
 ---
 
@@ -19,7 +19,7 @@ rationale. Do not duplicate rationale into board items, and do not track live st
 |---|---|---|
 | Status | `PVTSSF_lAHOB38DIc4BhEqTzhgB0vE` | Backlog `f75ad846`, Planned `9935e4cd`, In Progress `47fc9ee4`, Done `98236657` |
 | Priority | `PVTSSF_lAHOB38DIc4BhEqTzhgB9Dw` | Tier 1 `81a17eaa`, Tier 2 `97537018`, Shelved `7c38e779` |
-| Sprint | `PVTSSF_lAHOB38DIc4BhEqTzhgB9D0` | Sprint 2 `97a0e823`, Sprint 3 `e4a85fe9`, Sprint 4 `ae9c5ee9` |
+| Sprint | `PVTSSF_lAHOB38DIc4BhEqTzhgB9D0` | Sprint 2 `97a0e823`, Sprint 3 `e4a85fe9`, Sprint 4 `ae9c5ee9`, Sprint 5 `04b1e3dd` |
 
 This table can still drift stale if the field is edited by hand (GitHub's UI, or a mutation that
 omits existing ids) — re-read before trusting it whenever a write fails:
@@ -71,6 +71,59 @@ mutation {
 
 The response echoes back every option's id — confirm the existing ones match what you sent before
 trusting them for a subsequent write.
+
+## Converting a draft item to a real Issue
+
+Needed when a draft backlog item gets scheduled into a sprint (per the Rules section below). `gh`
+has no native subcommand for this — it needs a GraphQL mutation. Get the repository's node id once:
+
+```bash
+gh api graphql -f query='query { repository(owner: "noelwschneider", name: "kafka-portfolio-project") { id } }'
+```
+
+Then convert, passing the draft's project **item id** (not the draft's own `DI_...` content id):
+
+```bash
+gh api graphql -f query='
+mutation {
+  convertProjectV2DraftIssueItemToIssue(input: {
+    itemId: "<PVTI_... item id, from gh project item-list>"
+    repositoryId: "<repository id from above>"
+  }) {
+    item { id content { ... on Issue { number title url } } }
+  }
+}'
+```
+
+The project item id stays the same across the conversion — every field already set on it (Priority,
+Status, Sprint) carries over untouched. Only the `content` changes from a `DraftIssue` to a real
+`Issue` with a number and a repo URL. The draft's title and body become the new issue's title and
+body automatically.
+
+## Editing a draft item's title or body
+
+`gh project item-edit` only sets fields (Status, Priority, Sprint) — it has no option for a draft's
+title or body, and its `--field-id` flag will happily point at the Title field and silently overwrite
+it with whatever `--text` you pass, with no confirmation and no diff. This has actually happened:
+testing an edit against the wrong field replaced a draft's title with placeholder text before the
+mistake was caught. Use the dedicated mutation instead, addressed by the draft's own content id (the
+`DI_...` id, not the `PVTI_...` project item id):
+
+```bash
+gh api graphql -f query='
+mutation {
+  updateProjectV2DraftIssue(input: {
+    draftIssueId: "<DI_... id, from the item'"'"'s content.id in item-list output>"
+    body: "<full new body text>"
+  }) { draftIssue { id title } }
+}'
+```
+
+Omit `title` from the input to leave it untouched — pass both only when you actually mean to change
+both. When escaping a multi-line body inside the shell-quoted GraphQL string, watch for embedded
+apostrophes breaking out of the surrounding single-quoted `-f query='...'` — a stray one is exactly
+what leads to fumbling with `--field-id` instead as a workaround, which is how the title got
+overwritten in the first place.
 
 ## Common operations
 

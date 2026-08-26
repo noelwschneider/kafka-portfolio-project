@@ -26,6 +26,16 @@ REQUIRED = [
     "## Deliberately not covered",
 ]
 VERIFY_HEADING = "## How this was verified"
+CONTRACT_HEADING = "## Frozen contract impact"
+# Flyway migrations that touch a table docs/db-ownership.md documents (its own unique/check
+# constraints, column shapes, etc.) are a frozen-contract change per .claude/CLAUDE.md's
+# coordination protocol. Sprint 5 shipped exactly this kind of change (scenario-service's events
+# table dedupe key) with no db-ownership.md/CHANGELOG-contracts.md update and no report even
+# mentioning it — the instruction existed in the implementer preset body but was silently missed.
+# This is the structural backstop: touching a migration file forces an explicit answer, the same
+# way the SubagentStop gate already forces real verification evidence instead of trusting prose.
+MIGRATION_GLOB = "**/db/migration/*.sql"
+CONTRACT_DOCS = ("docs/db-ownership.md", "docs/CHANGELOG-contracts.md")
 # Used only when no start mark exists (gate added mid-session).
 FALLBACK_WINDOW_SECONDS = 24 * 60 * 60
 
@@ -76,6 +86,26 @@ def newest_report(root: Path, since: float):
     return newest
 
 
+def migration_touched(project: Path, since: float) -> bool:
+    for path in project.glob(MIGRATION_GLOB):
+        try:
+            if path.stat().st_mtime >= since:
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def contract_doc_touched(project: Path, since: float) -> bool:
+    for rel in CONTRACT_DOCS:
+        try:
+            if (project / rel).stat().st_mtime >= since:
+                return True
+        except OSError:
+            continue
+    return False
+
+
 def verification_has_evidence(text: str) -> bool:
     lines = text.splitlines()
     inside = False
@@ -117,7 +147,14 @@ def main() -> int:
     except OSError:
         return 0  # cannot read it; do not block on our own failure
 
-    missing = [h for h in REQUIRED if not re.search(rf"^{re.escape(h)}\s*$", text, re.M)]
+    required = list(REQUIRED)
+    needs_contract_note = migration_touched(project, since) and not contract_doc_touched(
+        project, since
+    )
+    if needs_contract_note:
+        required.append(CONTRACT_HEADING)
+
+    missing = [h for h in required if not re.search(rf"^{re.escape(h)}\s*$", text, re.M)]
     has_evidence = verification_has_evidence(text)
 
     if not missing and has_evidence:
@@ -130,6 +167,22 @@ def main() -> int:
         out.append("Missing required heading(s), which must appear verbatim:")
         out.extend(f"  {h}" for h in missing)
         out.append("")
+    if CONTRACT_HEADING in missing:
+        out += [
+            "You modified a Flyway migration under a db/migration/ directory without touching",
+            "docs/db-ownership.md or docs/CHANGELOG-contracts.md. If that migration changes the",
+            "shape of a table docs/db-ownership.md documents (a column, a unique/check constraint,",
+            "etc.), that is a frozen-contract change - follow the coordination protocol in",
+            ".claude/CLAUDE.md: propose the change in db-ownership.md, then log it in",
+            "docs/CHANGELOG-contracts.md.",
+            "",
+            f"Add '{CONTRACT_HEADING}' to your report either way, stating one of:",
+            "  - which table/constraint changed and that db-ownership.md and",
+            "    CHANGELOG-contracts.md were updated to match, or",
+            "  - why this migration does not touch anything db-ownership.md documents",
+            "    (e.g. a brand-new table, or a change to an undocumented internal detail).",
+            "",
+        ]
     if not has_evidence:
         out += [
             f"No command output found under '{VERIFY_HEADING}'.",

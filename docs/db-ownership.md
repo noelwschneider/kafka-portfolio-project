@@ -319,18 +319,29 @@ producer        text NOT NULL            -- publishing service, from the frozen 
 dead_lettered   boolean NOT NULL DEFAULT false
 payload         jsonb NOT NULL
 recorded_at     timestamptz NOT NULL DEFAULT now()
-UNIQUE (topic, partition, offset)
+UNIQUE (topic, partition, offset, event_id)
 ```
 
 **Phase 5 addition**, made through the coordination protocol — resolves this section's own
 "Event Explorer's backing store has no owner yet" note below. The one-line summary: Scenario
 Service already has to consume all four domain topics to build honest
 scenario-run timelines, so it is the natural single owner of the general-purpose event projection too,
-rather than standing up a second consumer of the same four topics. `UNIQUE (topic, partition, offset)`
-— not `event_id` alone — because a DLQ record and the domain record it was dead-lettered from
-legitimately share one `event_id` while being two distinct physical Kafka records; the same tuple also
+rather than standing up a second consumer of the same four topics. `UNIQUE (topic, partition, offset,
+event_id)` — not `event_id` alone — because a DLQ record and the domain record it was dead-lettered
+from legitimately share one `event_id` while being two distinct physical Kafka records; the tuple also
 makes the projection idempotent against Kafka's own at-least-once redelivery. Migration:
 `services/scenario-service/src/main/resources/db/migration/V2__events.sql`.
+
+**Sprint 5 correction.** The original `UNIQUE (topic, partition, offset)` (no `event_id`) assumed
+physical Kafka coordinates alone were a stable identity for a projected record. They are not: Kafka
+in `docker-compose.yml` had no persistent volume, so a local stack rebuild reset every topic's offsets
+to 0, and a genuinely new record landing at a reused `(topic, partition, offset)` collided with a
+stale pre-reset row and was silently dropped as already-projected — breaking the duplicate-event demo
+scenario and Order Detail's event timeline. `event_id` was added to the constraint (not substituted
+for the physical tuple, which stays load-bearing for the DLQ-record case above) so a reset-induced
+coincidence no longer reads as a duplicate. `docker-compose.yml`'s `kafka` service also gained a
+persistent volume as a first line of defense against the reset itself. Migration:
+`services/scenario-service/src/main/resources/db/migration/V3__events_dedupe_by_topic_partition_offset_and_event_id.sql`.
 
 ---
 

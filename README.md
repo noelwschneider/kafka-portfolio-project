@@ -286,8 +286,9 @@ rule 18 — no claim here is stronger than what's actually built):
   HTTP requests against the running services and visualizes actual resulting state, Kafka events,
   and SSE-pushed status changes — not a frontend animation (rule 10).
 
-Not yet built, stated plainly rather than left implicit: full CI/CD. A GitHub Actions workflow
-(`.github/workflows/build-images.yml`) exists, but it only builds and publishes the six container
-images to GHCR on manual `workflow_dispatch` — there is no workflow that runs tests on push/PR, and
-deployment to the public demo stays a manual `kubectl apply` rather than something the pipeline does
+Not yet built, stated plainly rather than left implicit: full CI/CD. `.github/workflows/ci.yml` runs
+each backend service's tests and the frontend's lint/build on every push and pull request, path-filtered
+so an isolated change only retriggers the services it actually touches — but publishing container images
+(`.github/workflows/build-images.yml`) stays manual `workflow_dispatch`, and deployment to the public
+demo stays a manual `kubectl apply` rather than something either pipeline does
 (`docs/adr/ADR-010-k3s-on-a-dedicated-hetzner-vps-for-the-public-demo.md`).

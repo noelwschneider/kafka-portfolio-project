@@ -34,10 +34,29 @@ services:
       # "already projected". This volume keeps local rebuilds from causing that in the first place;
       # the schema fix in scenario-service is the defense for when a reset happens anyway (topic
       # deletion, a genuinely fresh environment).
-      - orderfulfillment-kafka-data:/tmp/kraft-combined-logs
+      #
+      # Mounted at /var/lib/kafka/data, not /tmp/kraft-combined-logs: this image declares
+      # /var/lib/kafka/data as a VOLUME at build time, owned by appuser (the uid the broker process
+      # actually runs as), so Docker's populate-on-first-mount behavior gives a brand-new named
+      # volume the correct write permissions automatically. /tmp/kraft-combined-logs sits under a
+      # root-owned /tmp with no such pre-existing ownership, so a fresh volume mounted there needs a
+      # manual chown before the broker (running as uid 1000) can write to it — confirmed by
+      # reproducing the AccessDeniedException on first boot with that path. KAFKA_LOG_DIRS below
+      # must match this mount path; see the note there for why the env var is required at all.
+      - orderfulfillment-kafka-data:/var/lib/kafka/data
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
+      # Without this, the broker falls back to Kafka's own hardcoded default log dir
+      # (/tmp/kafka-logs). The running container's actual /opt/kafka/config/server.properties (the
+      # file the broker is launched against) only contains properties templated from KAFKA_* env
+      # vars, and log.dirs isn't one that's set anywhere here, so it was silently falling through to
+      # Kafka's built-in default rather than the /etc/kafka/docker/server.properties template default
+      # (/tmp/kraft-combined-logs) — confirmed by reading /tmp/kafka-logs/meta.properties directly on
+      # a running container. Set explicitly so the effective log dir matches the volume mount path
+      # above; otherwise the mounted volume just sits there empty and every rebuild silently resets
+      # offsets.
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
       # Phase 7: dual listeners. HOST is what host-side tools (local `mvn spring-boot:run`,
       # Testcontainers-based integration tests, `kafka-console-consumer` from your laptop) connect
       # to via localhost:9092, exactly as before this phase. INTERNAL is what containers on the
