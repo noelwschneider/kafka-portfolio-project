@@ -48,3 +48,9 @@ not just a convention. The workflow for any unit of work:
 This exists because pushing straight to `main` means CI runs asynchronously after the fact with nobody
 watching — that is exactly how Sprint 7's own CI failure went unnoticed until the developer caught it
 manually. Branch protection makes checking CI a gate the merge step cannot skip, not a step to remember.
+
+**If `gh pr checks` reports no checks at all after a genuine push** (not just still-running — actually
+absent), don't wait it out indefinitely. Confirm via `gh api repos/.../commits/<sha>/check-suites` that
+no `GitHub Actions` suite was even created (this has happened — a real GitHub-side delivery miss, not a
+misconfiguration), then `gh pr close <n>` immediately followed by `gh pr reopen <n>` to force a fresh
+`pull_request` event. That has reliably re-triggered it.
