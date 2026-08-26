@@ -13,7 +13,7 @@ Reference for the workflow in `user-guide.md`.
 | `/tier` | Picks model and effort - for a subagent, or for the current session | Before delegating, or when unsure the session is tiered right |
 | `/delegate` | Checklist for writing a delegation brief | Before spawning for non-trivial work |
 | `/board` | Adds and updates GitHub Project board items | Work identified, started, or finished |
-| `/redeploy` | Production redeploy with pre-flight checks and real verification | Deploying to the demo box |
+| `/deploy` | Guided production deploy (build, redeploy, verify), with pre-flight checks and real verification; `--restart-only` skips the build | Deploying to the demo box |
 
 ## Built-ins worth knowing
 

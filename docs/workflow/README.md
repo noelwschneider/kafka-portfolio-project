@@ -26,7 +26,7 @@ The executable pieces live in `.claude/` and are tracked in version control:
 | `/tier` | Pick the preset, model, and effort a task warrants |
 | `/delegate` | Compose a delegation brief that carries what the agent cannot get elsewhere |
 | `/board` | Add to or update the GitHub Project board |
-| `/redeploy` | Redeploy production with pre-flight capacity checks and real verification |
+| `/deploy` | Guided production deploy: build & push, redeploy, verify — or `--restart-only` to skip the build |
 | `/sprint-open` | Open a sprint: plan doc, index, board setup, carry practices forward |
 | `/sprint-close` | Close a sprint: reconcile the board and correct the record |
 | `/sprint-review` | Review a sprint: capture backlog items, route gaps, refine the workflow |
