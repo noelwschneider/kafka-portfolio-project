@@ -114,3 +114,50 @@ artifact (the `/deploy` skill/workflow definition itself). #38's decision gets w
 `.claude/agents/*.md` and/or `docs/workflow/agent-workflow.md` rather than a separate planning doc.
 #40 produces a findings-and-recommendations document as its first-phase deliverable, reviewed by the
 developer before any second-phase execution.
+
+## Closing state
+
+All five goals shipped and landed in six commits (`9aa8001`..`ab4f55c`).
+
+- **#41** — root cause was not what the task brief suspected (a commit-time exception-wrapping gap in
+  `ConsumerErrorHandlerFactory` itself). `services/scenario-service`'s `EventProjectionConsumer` was
+  never wired to the shared classifier at all — with no `*KafkaReliabilityConfig` bean in context,
+  Spring Boot's Kafka auto-configuration fell back to Spring Kafka's own bare default (zero backoff, no
+  DLQ) for every failure in that consumer, not just constraint violations. Fixed with a new
+  `ScenarioKafkaReliabilityConfig` following every other service's existing pattern, plus a new
+  `scenario.dlq` topic added under the coordination protocol. Independently verified by the `verifier`
+  preset against the live stack, per the contract-change rule in `docs/workflow/agent-workflow.md`.
+- **#42** — a `/deploy` skill designed to wrap the previously-disconnected `build-images.yml` dispatch
+  and `redeploy.sh` into one four-stage guided flow with explicit checkpoints. Consolidated with the
+  pre-existing `/redeploy` skill into a single command (`--restart-only` covers the no-new-build case)
+  rather than kept as two files, per developer direction after review surfaced the overlap. Four open
+  design forks resolved by the developer; tag pinning (`ghcr/kustomization.yaml`'s mutable `:latest`)
+  split out to its own backlog item as a real production config change outside a design task's scope.
+- **#38** — investigation found the actual exposure was broader than the task's own framing: not just
+  "presets don't mention the dev box" but that all four presets' unrestricted `Bash` access means
+  nothing mechanically stops a subagent from reaching the dev box's credentials on its own initiative.
+  Measured (not assumed) that the local stack idles at ~68% of the local memory cap, giving a concrete
+  basis for the routing threshold. Developer resolved all five flagged judgment calls: local by default,
+  documentation-only concurrency cap (not mechanically enforced), the "ask before anything risky" rule
+  generalized from `platform` to all four presets, a new `dev-box` skill created, and whether the dev
+  box is even the right resource for agent contention split out to its own backlog item rather than
+  decided here.
+- **#39** — four cross-sprint failure patterns identified by mechanism, not surface similarity: ephemeral
+  Kafka-coordinate identity keys that don't survive a broker reset; async-completion races between
+  independently-progressing consumers; the shared retry classifier's repository-call-time assumption
+  (directly feeding #39's own sibling task, #41); and an asymmetric compensation gap. A cross-cutting
+  finding — every defect lived inside a branch designed to be a quiet no-op — gives a concrete, cheap
+  search heuristic for a future targeted bug hunt.
+- **#40** — frozen contracts, ADRs, and the per-sprint directory structure all checked out clean. Three
+  real findings actioned: a genuine dead link in `project-overview.md` fixed; `docs/study-guide/` (83
+  files) and `docs/external/claude-effort.md` found committed to the repo by accident (a `.gitignore`
+  pattern collapse aimed at fixing `docs/agent-reports/` dropped their ignore rules too) and untracked,
+  restoring what their own text always claimed; the `docs/_old/` "preserved" wording in the planning
+  index corrected to state it's local-only, since it's correctly gitignored and never actually shipped.
+
+Three items surfaced during execution were deliberately not resolved in this sprint and instead filed
+as their own backlog items, consistent with the sprint's own scope boundaries: whether the dev box is
+the right resource for parallel-agent contention at all (not just when to route to it), pinning an
+immutable per-commit-SHA tag in `ghcr/kustomization.yaml`, and (raised independently by the developer,
+unrelated to any single goal) a recurring project-backlog review and a way to handle work that needs
+partial or continuous developer involvement mid-task.
