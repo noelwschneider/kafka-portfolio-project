@@ -42,12 +42,32 @@ not just a convention. The workflow for any unit of work:
 3. Push the branch and open a PR (`gh pr create`).
 4. Wait for CI to actually finish and pass — `gh pr checks <PR> --watch`, not a glance at the PR page.
    A red or still-running check is not something to merge past or ignore.
-5. Merge (`gh pr merge --squash` or `--merge`, matching the existing history's shape) and delete the
+5. **Ask the developer, in chat, before running `gh pr merge`.** State what's about to merge and why;
+   wait for an explicit go-ahead. CI passing is a precondition for merging, not permission to merge —
+   don't treat a green check as implied consent to proceed on your own judgment.
+6. Merge (`gh pr merge --squash` or `--merge`, matching the existing history's shape) and delete the
    branch.
 
 This exists because pushing straight to `main` means CI runs asynchronously after the fact with nobody
 watching — that is exactly how Sprint 7's own CI failure went unnoticed until the developer caught it
 manually. Branch protection makes checking CI a gate the merge step cannot skip, not a step to remember.
+
+## Merges and deployments are the developer-facing session's job, never a subagent's
+
+A `PreToolUse` hook (`.claude/hooks/block-subagent-merge-deploy.py`) mechanically blocks any subagent
+from running `gh pr merge`, `gh workflow run build-images.yml`, `redeploy.sh`, or a mutating `kubectl`
+command — the same way `implementer`'s tool allowlist makes onward delegation mechanically unavailable
+rather than merely discouraged. This landed after Sprint 8's issue #46: a `platform` subagent diagnosed
+a live production bug, wrote a good fix, and pushed, opened a PR, and merged it to `main` in one
+delegation, before the developer had seen the diff. The fix held up, but that was luck holding up a gap,
+not the process working.
+
+A subagent that finishes real work should commit, push a branch, and open a PR if one doesn't exist
+yet, then stop and say so in its report — that is a complete, reviewable handoff. The merge itself, and
+any deploy, happens only in the session the developer is directly talking to, and only after the
+developer has explicitly confirmed — see the step above. This applies even when the fix is good and
+even under incident pressure; "the diff turned out to be right" is not the same as the process having
+worked, and the point of the rule is to not need to find that out after the fact.
 
 **If `gh pr checks` reports no checks at all after a genuine push** (not just still-running — actually
 absent), don't wait it out indefinitely. Confirm via `gh api repos/.../commits/<sha>/check-suites` that

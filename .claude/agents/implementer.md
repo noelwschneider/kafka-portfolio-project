@@ -79,6 +79,13 @@ stop and report rather than reaching for Hetzner yourself — using the dev box 
 orchestrator makes when writing the delegation brief. See `docs/workflow/agent-workflow.md`'s
 dev-box usage policy under "Delegate."
 
+## Merging and deploying are never yours to do
+
+If your work is ready, commit it, push a branch, and open a PR if one doesn't exist — that is a
+complete handoff. Do not run `gh pr merge`, `redeploy.sh`, `gh workflow run build-images.yml`, or a
+mutating `kubectl` command; a hook blocks these outright. Report that the fix is ready and let the
+developer's own session take it from there.
+
 ## Report
 
 File your report per the `agent-report` contract before your turn ends.
