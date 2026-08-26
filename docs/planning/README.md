@@ -66,15 +66,26 @@ and per-column filtering unscheduled and returned to the backlog; everything els
 |---|---|
 | [`sprint-4/sprint-4-plan.md`](sprint-4/sprint-4-plan.md) | This sprint's goals, sequencing, and closing state |
 
-### `sprint-5/` — backend correctness and reliability (current)
+### `sprint-5/` — backend correctness and reliability (complete)
 
 Theme: whether the system's core delivery guarantees actually hold, and closing the gap between the
 project's Day-1 CI decision and what exists today — a deliberate pivot from Sprint 4's frontend focus.
-See [`sprint-5/sprint-5-plan.md`](sprint-5/sprint-5-plan.md) for the full plan.
+See [`sprint-5/sprint-5-plan.md`](sprint-5/sprint-5-plan.md) for the full plan and closing state.
 
 | File | What's in it |
 |---|---|
-| [`sprint-5/sprint-5-plan.md`](sprint-5/sprint-5-plan.md) | This sprint's goals, sequencing, and scope |
+| [`sprint-5/sprint-5-plan.md`](sprint-5/sprint-5-plan.md) | This sprint's goals, sequencing, and closing state |
+
+### `sprint-6/` — recruiter-facing polish and demo reliability (current)
+
+Theme: visible gaps and small defects on the deployed site, filtered against what a recruiter or
+interviewer actually sees in a short visit — not new features, and not the deep backend correctness
+work of Sprint 5. All six goals shipped. See
+[`sprint-6/sprint-6-plan.md`](sprint-6/sprint-6-plan.md) for the full plan and closing state.
+
+| File | What's in it |
+|---|---|
+| [`sprint-6/sprint-6-plan.md`](sprint-6/sprint-6-plan.md) | This sprint's goals, sequencing, and closing state |
 
 ## Cross-reference note
 
