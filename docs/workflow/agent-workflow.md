@@ -151,6 +151,22 @@ criteria, runs the suite itself, confirms the claimed behavior actually executes
 fail per criterion. It cannot edit source — its tool allowlist excludes `Edit` — so it can only report,
 never quietly fix what it finds.
 
+"Consequential work" is not left to the orchestrating session's in-the-moment judgment call — that
+judgment reliably loses to momentum. Sprint 6 shipped six goals, including a concurrency fix
+(`RunRegistry`'s deferred-cleanup change, issue #36) in the same subsystem an earlier sprint had
+already had an incident in, and every one of them was verified by the orchestrator reading the diff
+and report rather than by an independent `verifier` delegation — not because the work didn't warrant
+it, but because a thorough self-report is easy to mistake for equivalent evidence in the moment. Two
+categories get an actual `verifier` delegation before being marked Done, not just orchestrator
+diff review, regardless of how convincing the implementing agent's own report reads:
+
+- **Concurrency or shared-state changes** — anything touching timing, ordering, retries, or state
+  shared across requests/threads/consumers. This project's most expensive failures (Phase 7/8, the
+  Sprint 4 OOM, Sprint 5's #27/#29) all lived here.
+- **Contract changes** — anything touching `docs/openapi/`, `docs/events/`,
+  `docs/order-state-machine.md`, or `docs/db-ownership.md`. Sprint 5 already had one contract change
+  land without following the coordination protocol, caught only at sprint review.
+
 Results route back through the orchestrator rather than directly between agents. Inter-agent
 messaging is available, but passing finished work agent-to-agent bypasses this checkpoint; its
 value here is agents challenging each other, not accepting each other's conclusions.
