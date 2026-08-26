@@ -19,6 +19,29 @@ Layout:
 | `create-postgres-secret.sh` | Generates the Postgres `Secret` at apply time instead of using the committed dev password |
 | `redeploy.sh` | Restarts the five backend Deployments, then the frontend Deployment, one at a time, waiting for each to become healthy before starting the next |
 
+## `kubectl` access from off the box
+
+The k3s API server (port 6443) is not exposed publicly — only SSH, HTTP, and HTTPS reach the box.
+`redeploy.sh` and `kubectl` were originally only ever run from the box itself, where the `deploy`
+user's `~/.kube/config` already points at `127.0.0.1:6443`. To run them from a local machine or an
+agent session instead, tunnel through the existing SSH alias rather than opening the API port:
+
+```bash
+ssh -f -N -L 16443:127.0.0.1:6443 kafka-demo-box
+```
+
+Then use a kubeconfig context named `kafka-demo-box` pointed at `https://127.0.0.1:16443` (the same
+client cert/key `scp`'d from `kafka-demo-box:~/.kube/config`, with only the server address rewritten
+to the tunnel's local port). `current-context` should stay unset by default so `kubectl` never
+silently targets production — switch to it deliberately per session:
+
+```bash
+kubectl config use-context kafka-demo-box
+```
+
+The tunnel is a background process tied to the shell that started it — it does not persist across a
+new terminal or a new agent session, so this needs repeating each time.
+
 ## Deploying
 
 ```bash

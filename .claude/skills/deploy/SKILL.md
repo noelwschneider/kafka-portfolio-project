@@ -42,6 +42,16 @@ operator to infer state from scrollback.
 
 ## Stage 0 — Check before you act (always runs, read-only)
 
+The k3s API server isn't reachable directly — tunnel through the existing SSH alias first if
+`kubectl config get-contexts` shows no `kafka-demo-box` context is live, then switch to it (never
+leave it as the default `current-context`; see `infrastructure/kubernetes/production/README.md`'s
+"`kubectl` access from off the box" section for the full setup):
+
+```bash
+ssh -f -N -L 16443:127.0.0.1:6443 kafka-demo-box   # only if the tunnel isn't already running
+kubectl config use-context kafka-demo-box
+```
+
 ```bash
 kubectl config current-context
 kubectl top nodes
@@ -52,8 +62,8 @@ curl -sS -o /dev/null -w '%{http_code}\n' --max-time 10 https://fulfillment-demo
 git rev-parse HEAD
 ```
 
-- If `current-context` is not the demo box, **stop** — nothing past this point should run against the
-  wrong cluster.
+- If `current-context` is not `kafka-demo-box`, **stop** — nothing past this point should run against
+  the wrong cluster.
 - If a node is already near its memory ceiling, pods are not in a steady `Running` state, or the demo
   is not currently serving 200, stop and diagnose first. Starting a build-and-redeploy cycle on a box
   that is already stressed is exactly the precondition ADR-011's outage started from. A build itself is
