@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Restarts the five backend Deployments one at a time, waiting for each rollout to finish before
-# starting the next.
+# Restarts the five backend Deployments, then the frontend Deployment, one at a time, waiting for
+# each rollout to finish before starting the next.
 #
 # Why this exists instead of `kubectl rollout restart deployment -n orderfulfillment`: that command
 # restarts all Deployments in the namespace in one shot. With maxSurge: 0 (see patch-tuning.yaml's
@@ -13,8 +13,16 @@
 # for one service into a loud, immediate failure instead of a compounding one — the next service
 # never starts if the current one does not come up clean.
 #
+# Frontend goes last, after the same one-at-a-time discipline as the backend fleet. It does not
+# carry the memory rationale above — it is a static nginx container (64-128Mi request/limit, see
+# ../09-frontend.yaml) next to JVM services requesting hundreds of MiB each, and it does not get the
+# maxSurge: 0 patch (patch-tuning.yaml's T5 applies to the five backend Deployments only), so its own
+# restart can briefly run old and new pods together without materially affecting the box's memory
+# headroom. It is still restarted through this script rather than by hand so that "run redeploy.sh"
+# stays the one command that actually gets a freshly pushed image live, for any of the six services.
+#
 # Usage:
-#   ./redeploy.sh                    # restart all five, in order, 120s timeout each
+#   ./redeploy.sh                    # restart all six, in order, 120s timeout each
 #   ./redeploy.sh --timeout 180s     # override the per-service rollout timeout
 #
 # Requires: kubectl pointed at the target cluster (KUBECONFIG set, as it is on the demo box).
@@ -25,13 +33,16 @@ NAMESPACE="orderfulfillment"
 TIMEOUT="120s"
 
 # Order matters only in that it is deterministic and easy to reason about; there is no dependency
-# ordering between these five at the Kubernetes level (Kafka and Postgres are not restarted here).
+# ordering between these six at the Kubernetes level (Kafka and Postgres are not restarted here).
+# Frontend is last because it is the one entry here without the memory rationale that orders the
+# other five — see the header comment.
 DEPLOYMENTS=(
   order-service
   inventory-service
   payment-service
   fulfillment-service
   scenario-service
+  frontend
 )
 
 while [[ $# -gt 0 ]]; do
@@ -64,4 +75,4 @@ for deployment in "${DEPLOYMENTS[@]}"; do
   echo "==> deployment/${deployment} healthy" >&2
 done
 
-echo "==> All ${#DEPLOYMENTS[@]} backend deployments restarted and healthy." >&2
+echo "==> All ${#DEPLOYMENTS[@]} deployments restarted and healthy." >&2

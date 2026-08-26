@@ -32,6 +32,8 @@ servers:
 tags:
   - name: orders
     description: Production-style order API. Never mixed with demo/fault-injection endpoints.
+  - name: prices
+    description: Read-only exposure of Order Service's seeded SKU price map.
 
 paths:
   /api/orders:
@@ -219,8 +221,59 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /api/prices:
+    get:
+      tags: [prices]
+      operationId: listPrices
+      summary: List the seeded SKU price map
+      description: |
+        Read-only lookup of the same static SKU → price map Order Service applies to
+        `OrderItem.unitPrice` at order creation (`docs/db-ownership.md`, "Where prices come
+        from"). Added so the frontend's New Order form can show a price before an item is added
+        to an order, without fetching or fabricating one from Inventory Service, and without any
+        write path — this endpoint carries no way to change a price and is not consulted at
+        checkout time; `POST /api/orders` still prices independently from the same in-process
+        catalog.
+      responses:
+        '200':
+          description: All seeded SKU prices.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SkuPrice'
+              examples:
+                seeded:
+                  value:
+                    - sku: SKU-001
+                      unitPrice: 129.00
+                    - sku: SKU-002
+                      unitPrice: 189.00
+                    - sku: SKU-003
+                      unitPrice: 14.50
+                    - sku: SKU-004
+                      unitPrice: 249.00
+        '500':
+          $ref: '#/components/responses/InternalError'
+
 components:
   schemas:
+    SkuPrice:
+      type: object
+      required: [sku, unitPrice]
+      properties:
+        sku:
+          type: string
+          pattern: '^SKU-[0-9]{3}$'
+          examples: [SKU-001]
+        unitPrice:
+          type: number
+          multipleOf: 0.01
+          description: |
+            Same seeded value `OrderItem.unitPrice` is captured from at order creation. Display
+            only — this endpoint is not consulted at checkout time.
+
     OrderStatus:
       type: string
       description: |

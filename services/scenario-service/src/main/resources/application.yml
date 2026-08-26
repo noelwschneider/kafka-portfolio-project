@@ -59,6 +59,15 @@ orderfulfillment:
     # load, even though the order itself reaches FULFILLED promptly (see OrderStatusWatcher's
     # per-call timeout overload).
     high-volume-order-watch-timeout-ms: 60000
+    # Issue #36: how long a completed run's correlationId -> runId mapping (RunRegistry) and
+    # timeline-sequence bookkeeping (TimelineRecorder) are kept alive after the run reaches a
+    # terminal status, before being torn down. EventProjectionConsumer runs in its own Kafka
+    # consumer group, independent of whatever marks the run terminal, and routinely has not yet
+    # consumed/projected the last record or two (e.g. DuplicateEventScenario's fire-and-forget
+    # republish) by the time the run's harness thread returns — tearing the mapping down at that
+    # instant meant those EVENT-kind timeline entries had nowhere to attach. 10s is generous
+    # relative to local Kafka produce-to-consume latency (sub-second in practice).
+    late-event-grace-ms: 10000
   idle-reset:
     # W4 (docs/agent-reports/sprint-2/deployment-code-changes-briefing.md): scheduled auto-reset for
     # a demo box left stuck after a scenario dies mid-run. Off by default — a reset firing during

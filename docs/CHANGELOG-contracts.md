@@ -13,6 +13,38 @@ Newest first. Each entry states what changed, why, who is affected, and what the
 
 ---
 
+## 2026-08-26 — `order-service.yaml`: new read-only `GET /api/prices`
+
+**Changed by:** Sprint 6, issue #32 (New Order form's inventory table has no price column).
+
+**What changed.** `docs/openapi/order-service.yaml` gains `GET /api/prices`, returning the array
+`[{sku, unitPrice}, ...]` (new `SkuPrice` schema), plus a `prices` tag. Implemented by
+`services/order-service/src/main/java/com/orderfulfillment/order/PriceController.java`, reading
+`SkuPriceCatalog.allPrices()` — a new method on the same catalog `POST /api/orders` already uses to
+price a line, no new price source. `docs/db-ownership.md`'s "Where prices come from" section notes
+the endpoint exists; ownership of the price map is unchanged (still Order Service, still no price
+column on `inventory_items`).
+
+**Why.** The frontend's New Order inventory table had no way to show a price: Inventory Service's
+`InventoryItem` carries no price field, and `OrderItem.unitPrice` was previously captured only
+server-side at order creation, never exposed for lookup ahead of time. Rather than move price
+ownership into Inventory Service — a bigger change touching `db-ownership.md`'s ownership boundaries
+and requiring a seed-data migration — this exposes Order Service's existing seeded map read-only.
+
+**Who is affected.**
+
+- **Order Service** — already implemented: `SkuPriceCatalog.allPrices()`, `PriceController`.
+- **Frontend** — `frontend/src/api/orders.ts` gains `getPrices()`; `CreateOrderPage.tsx`'s
+  inventory table gains a Price column populated from it.
+- **Everyone else** — no action. No existing event payload, table, or API shape changed; this is a
+  new, additive, read-only endpoint with no write path and no role in checkout-time pricing —
+  `POST /api/orders` continues to price independently from the same in-process catalog.
+
+**Not changed.** No price editing, no checkout-time price validation against this endpoint, no
+change to Inventory Service's schema or ownership.
+
+---
+
 ## 2026-08-25 — `db-ownership.md`: Scenario Service `events` table dedupe key extended to include `event_id`
 
 **Changed by:** Sprint 5, issue #27 (Event projection dedup key not stable across Kafka broker reset).

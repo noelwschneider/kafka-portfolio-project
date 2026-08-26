@@ -11,6 +11,7 @@ public record ScenarioProperties(
         int highVolumeSubmissionConcurrency,
         long highVolumeLagPollIntervalMs,
         long highVolumeLagPollTimeoutMs,
-        long highVolumeOrderWatchTimeoutMs
+        long highVolumeOrderWatchTimeoutMs,
+        long lateEventGraceMs
 ) {
 }

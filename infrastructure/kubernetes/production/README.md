@@ -17,7 +17,7 @@ Layout:
 | `local-verify/` | The same overlay against locally-built `kind` images, so the whole thing can be exercised without a registry |
 | `render.sh` | Renders any of the above to stdout, to be piped into `kubectl apply -f -` |
 | `create-postgres-secret.sh` | Generates the Postgres `Secret` at apply time instead of using the committed dev password |
-| `redeploy.sh` | Restarts the five backend Deployments one at a time, waiting for each to become healthy before starting the next |
+| `redeploy.sh` | Restarts the five backend Deployments, then the frontend Deployment, one at a time, waiting for each to become healthy before starting the next |
 
 ## Deploying
 
@@ -48,16 +48,24 @@ Deployments to pull them:
 infrastructure/kubernetes/production/redeploy.sh
 ```
 
-**Do not use `kubectl rollout restart deployment -n orderfulfillment`** (restarts every backend
-Deployment in the namespace at once) or `kubectl rollout restart deployment/<name>` run manually
-five times in a row without waiting between them. Either one can put old and new pods of multiple
-services in memory at the same time on a box with no spare RAM and no swap — that combination took
-the demo box down for a full outage; see
-`docs/adr/ADR-011-sequential-production-rollouts-to-avoid-memory-exhaustion.md`. `redeploy.sh`
-restarts the five backend Deployments one at a time and waits for
+**Do not use `kubectl rollout restart deployment -n orderfulfillment`** (restarts every Deployment
+in the namespace at once) or `kubectl rollout restart deployment/<name>` run manually one at a time
+without waiting between them. Either one can put old and new pods of multiple services in memory at
+the same time on a box with no spare RAM and no swap — that combination took the demo box down for a
+full outage; see `docs/adr/ADR-011-sequential-production-rollouts-to-avoid-memory-exhaustion.md`.
+`redeploy.sh` restarts the five backend Deployments, then `frontend`, one at a time, and waits for
 `kubectl rollout status` to confirm each is healthy before restarting the next, so the fleet never
 needs more than one service's worth of extra memory during the restart, and a stuck rollout for one
 service fails loudly instead of compounding into a second one.
+
+Frontend is included in the same script, at the end of the sequence, but for a different reason than
+the backend ordering: it is a static nginx container requesting 64Mi/limited to 128Mi (see
+`../09-frontend.yaml`), small enough next to the JVM services that it does not carry the
+maxSurge: 0 patch applied to the five backend Deployments (`common/patch-tuning.yaml`'s T5 comment
+covers only those five), so a brief overlap of its old and new pod during rollout does not
+meaningfully change the box's memory headroom. It stays in `redeploy.sh` regardless, so that pushing
+a new frontend image to GHCR has the same one-command path to the live site as a backend change —
+there is no separate, undocumented step required to pick it up.
 
 `ghcr/kustomization.yaml` points at `ghcr.io/noelwschneider/kafka-portfolio-project/{service}`,
 the same path `.github/workflows/build-images.yml` derives from `${{ github.repository }}` at build

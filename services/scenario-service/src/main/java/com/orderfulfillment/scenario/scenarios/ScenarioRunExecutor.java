@@ -1,6 +1,7 @@
 package com.orderfulfillment.scenario.scenarios;
 
 import com.orderfulfillment.common.CorrelationIdHolder;
+import com.orderfulfillment.scenario.config.ScenarioProperties;
 import com.orderfulfillment.scenario.domain.ScenarioRunEntity;
 import com.orderfulfillment.scenario.domain.ScenarioRunRepository;
 import com.orderfulfillment.scenario.domain.ScenarioRunStatus;
@@ -9,9 +10,13 @@ import com.orderfulfillment.scenario.runtime.RunEventHub;
 import com.orderfulfillment.scenario.runtime.RunRegistry;
 import com.orderfulfillment.scenario.runtime.ScenarioRunMapper;
 import com.orderfulfillment.scenario.runtime.TimelineRecorder;
+import jakarta.annotation.PreDestroy;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
@@ -33,15 +38,32 @@ public class ScenarioRunExecutor {
     private final RunEventHub runEventHub;
     private final TimelineRecorder timelineRecorder;
     private final ScenarioRunMapper mapper;
+    private final ScenarioProperties properties;
+
+    /** Backs the deferred correlationId/timeline-sequence cleanup issue #36 requires (see {@link
+     * #complete}) — a single daemon thread is plenty for the handful of scenario runs this service
+     * ever has in flight at once. */
+    private final ScheduledExecutorService lateCleanupScheduler =
+            Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread thread = new Thread(r, "scenario-run-late-cleanup");
+                thread.setDaemon(true);
+                return thread;
+            });
 
     public ScenarioRunExecutor(ScenarioRunRepository runRepository, RunRegistry runRegistry,
                                 RunEventHub runEventHub, TimelineRecorder timelineRecorder,
-                                ScenarioRunMapper mapper) {
+                                ScenarioRunMapper mapper, ScenarioProperties properties) {
         this.runRepository = runRepository;
         this.runRegistry = runRegistry;
         this.runEventHub = runEventHub;
         this.timelineRecorder = timelineRecorder;
         this.mapper = mapper;
+        this.properties = properties;
+    }
+
+    @PreDestroy
+    void shutdownLateCleanupScheduler() {
+        lateCleanupScheduler.shutdown();
     }
 
     @Async("scenarioExecutor")
@@ -82,7 +104,27 @@ public class ScenarioRunExecutor {
         ScenarioRunDto dto = mapper.toDto(run, List.of());
         runEventHub.publishRunStatus(runId, dto);
         runEventHub.close(runId);
-        timelineRecorder.forget(runId);
-        runRegistry.finish(scenarioName, correlationId);
+        // The 409 "already running" guard frees immediately — a user retriggering the same scenario
+        // right after it finishes must not see a stale conflict.
+        runRegistry.releaseSlot(scenarioName);
+        // The correlationId -> runId mapping (and TimelineRecorder's per-run sequence counter) stay
+        // alive a while longer: issue #36. EventProjectionConsumer's own consumer group routinely
+        // hasn't caught up on the run's last Kafka record(s) yet at this exact instant, and tearing
+        // this bookkeeping down immediately meant that late EVENT-kind entry had nowhere to attach.
+        scheduleLateCleanup(runId, correlationId);
+    }
+
+    private void scheduleLateCleanup(String runId, UUID correlationId) {
+        try {
+            lateCleanupScheduler.schedule(() -> {
+                timelineRecorder.forget(runId);
+                runRegistry.retireCorrelation(correlationId);
+            }, properties.lateEventGraceMs(), TimeUnit.MILLISECONDS);
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            // Scheduler already shut down (application shutting down) — clean up inline rather than
+            // leaking the mapping for the remainder of the process's life, which is now moot anyway.
+            timelineRecorder.forget(runId);
+            runRegistry.retireCorrelation(correlationId);
+        }
     }
 }

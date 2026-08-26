@@ -1,7 +1,9 @@
 package com.orderfulfillment.order;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import org.springframework.stereotype.Component;
 
 /**
@@ -21,5 +23,14 @@ public class SkuPriceCatalog {
 
     public BigDecimal priceFor(String sku) {
         return PRICES.get(sku);
+    }
+
+    /**
+     * All seeded prices, sorted by SKU for a stable response — backs {@code GET /api/prices}
+     * (issue #32), a read-only lookup so the frontend can show a price before an order exists,
+     * rather than fabricating one or moving price ownership into Inventory Service.
+     */
+    public List<Map.Entry<String, BigDecimal>> allPrices() {
+        return List.copyOf(new TreeMap<>(PRICES).entrySet());
     }
 }

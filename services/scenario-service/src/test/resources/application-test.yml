@@ -15,3 +15,4 @@ orderfulfillment:
     high-volume-lag-poll-interval-ms: 100
     high-volume-lag-poll-timeout-ms: 3000
     high-volume-order-watch-timeout-ms: 15000
+    late-event-grace-ms: 2000

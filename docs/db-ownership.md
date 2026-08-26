@@ -367,6 +367,10 @@ call to another to price an order.
 Seed stock is unchanged from `docs/planning/sprint-1/backend-design.md`'s Seed Data section: SKU-001: 10,
 SKU-002: 5, SKU-003: 100, SKU-004: 2.
 
+Order Service exposes this map read-only at `GET /api/prices` (`docs/openapi/order-service.yaml`) so
+a client can show a price before an order exists; the map's ownership does not change and the
+endpoint carries no write path.
+
 This does mean `display_name` lives in Inventory Service while `unit_price` lives in Order Service —
 product data split across two owners. That is the honest cost of the decision, and it is acceptable
 here only because `docs/planning/project-overview.md` §3 rules out a real catalog: there is no
