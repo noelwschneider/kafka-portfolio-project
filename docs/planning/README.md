@@ -76,7 +76,7 @@ See [`sprint-5/sprint-5-plan.md`](sprint-5/sprint-5-plan.md) for the full plan a
 |---|---|
 | [`sprint-5/sprint-5-plan.md`](sprint-5/sprint-5-plan.md) | This sprint's goals, sequencing, and closing state |
 
-### `sprint-6/` — recruiter-facing polish and demo reliability (current)
+### `sprint-6/` — recruiter-facing polish and demo reliability (complete)
 
 Theme: visible gaps and small defects on the deployed site, filtered against what a recruiter or
 interviewer actually sees in a short visit — not new features, and not the deep backend correctness
@@ -86,6 +86,17 @@ work of Sprint 5. All six goals shipped. See
 | File | What's in it |
 |---|---|
 | [`sprint-6/sprint-6-plan.md`](sprint-6/sprint-6-plan.md) | This sprint's goals, sequencing, and closing state |
+
+### `sprint-7/` — workflow and process hardening (current)
+
+Theme: how the project itself is run, not the application — closing demonstrated process gaps in
+delegated-agent infrastructure usage and production deploys, plus retrospective audits of bug
+patterns and documentation staleness. Primarily non-code, with one Tier 1 bug fix carried in
+regardless of theme. See [`sprint-7/sprint-7-plan.md`](sprint-7/sprint-7-plan.md) for the full plan.
+
+| File | What's in it |
+|---|---|
+| [`sprint-7/sprint-7-plan.md`](sprint-7/sprint-7-plan.md) | This sprint's goals, sequencing, developer-involvement checkpoints, and dependencies |
 
 ## Cross-reference note
 
