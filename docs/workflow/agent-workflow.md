@@ -198,6 +198,16 @@ One commit per logically coherent unit of work, not one per delegation. Commit m
 human's: terse, matching the existing history, describing the change rather than restating the diff.
 No `Co-Authored-By` trailer.
 
+**Merging and deploying happen only in the session the developer is directly talking to, and only
+after the developer explicitly confirms.** A subagent that finishes real work commits, pushes a
+branch, and opens a PR if one doesn't exist — then stops and reports. It does not merge that PR, run
+`redeploy.sh`, dispatch `build-images.yml`, or run a mutating `kubectl` command; a `PreToolUse` hook
+(`.claude/hooks/block-subagent-merge-deploy.py`) makes this mechanically true rather than a preset
+sentence hoping it's followed. This landed after Sprint 8's issue #46, where a `platform` subagent
+diagnosed and fixed a live production bug well, then pushed, opened a PR, and merged it to `main`
+itself in the same delegation — before the developer had seen the diff. The fix held up, which is not
+the same as the process having worked.
+
 Unplanned work is logged to the board too, including retroactively.
 
 ### Close and review

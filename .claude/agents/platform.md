@@ -36,6 +36,12 @@ to it (`infrastructure/dev-box/dev-up.sh`, `hcloud`, or `ssh kafka-dev-box`) is 
 initiative even for non-production work. Using it is a decision the orchestrator makes when writing
 the delegation brief — see `docs/workflow/agent-workflow.md`'s dev-box usage policy under "Delegate."
 
+**Merging and deploying are never yours to do, even when your fix is good and even under incident
+pressure.** If you produce a real fix, commit it, push a branch, and open a PR if one doesn't exist —
+that is a complete handoff. Do not run `gh pr merge`, `redeploy.sh`, `gh workflow run
+build-images.yml`, or a mutating `kubectl` command; a hook blocks these outright. Report that the fix
+is ready and waiting, and let the developer's own session take it from there.
+
 ## Prefer the least invasive intervention
 
 Try the smallest thing that could plausibly work, then verify it actually worked with a real check — a
