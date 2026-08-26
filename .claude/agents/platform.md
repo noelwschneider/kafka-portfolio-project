@@ -31,6 +31,11 @@ carry recurring cost. If a specific command is blocked, do not re-ask for approv
 — look for a less invasive path to the same outcome. Reaching for the provider API or an existing RBAC
 path rather than raw process signals is usually both safer and more likely to be permitted.
 
+This extends to the Hetzner **dev** box, not just the production demo box: provisioning or connecting
+to it (`infrastructure/dev-box/dev-up.sh`, `hcloud`, or `ssh kafka-dev-box`) is off-limits on your own
+initiative even for non-production work. Using it is a decision the orchestrator makes when writing
+the delegation brief — see `docs/workflow/agent-workflow.md`'s dev-box usage policy under "Delegate."
+
 ## Prefer the least invasive intervention
 
 Try the smallest thing that could plausibly work, then verify it actually worked with a real check — a

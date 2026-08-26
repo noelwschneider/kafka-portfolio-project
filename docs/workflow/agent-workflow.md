@@ -131,6 +131,21 @@ and line numbers, what has already been ruled out, and explicit scope boundaries
 to be retyped every time — verification requirements, the report contract, foreground-execution rules,
 teardown expectations — is in the preset body.
 
+**Dev box vs. local stack.** Local `docker-compose` is the default for delegated verification — free,
+no credentials, and how the large majority of delegated work has always run without incident when
+scoped-rebuild discipline (see each preset's "rebuild only what your change touches") is followed. Route
+a task to the Hetzner dev box (`infrastructure/dev-box/`, via the `dev-box` skill) only when it genuinely
+needs `kind`/Kubernetes at a scale the local ~3.8GB cap can't hold, or when more than one full-stack
+rebuild would otherwise need to run concurrently and can't just be serialized instead — one stack alone
+already idles at ~68% of that cap, so a second concurrent full rebuild is close to guaranteed to exceed
+it. This is always the orchestrator's decision, made when writing the delegation brief, never a
+subagent's own judgment call: every preset's Bash access is unrestricted, so nothing stops a subagent
+from reaching for the dev box's credentials on its own, and doing so is a billable, credentialed,
+real-world action — each preset carries an explicit rule against it. The concurrency cap (one
+full-stack rebuild per host at a time) is documented guidance, not mechanically enforced — the existing
+resource-scoped-rebuild mitigation plus the `kafka` named volume have already reduced two OOM incidents
+to zero data loss, which isn't a strong enough track record of harm yet to justify a lock or hook.
+
 ### Verify
 
 Verification is an enforced gate, not a step someone remembers.
@@ -229,3 +244,12 @@ asking.
 `prompt` or `agent` adds a model-judged check of whether the reported evidence actually supports the
 claim, at a token cost on every delegation. Worth adding for infrastructure and concurrency work first,
 where this project's most expensive failures have occurred.
+
+**Whether the dev box is even the right resource for agent contention.** The dev-box-vs-local policy
+above resolves *when* to route delegated work to the dev box, but not whether the dev box — designed
+and documented as a single, exclusive resource for one person's solo chaos/load-testing sessions — is
+the right tool for parallel-agent resource contention at all. It's still one exclusive box: two
+delegations that both want it at once just relocate the contention problem to Hetzner instead of
+removing it, and nothing here designs a queuing or reservation mechanism for that case. Tracked as its
+own backlog item rather than folded into the policy above, since it needs its own dedicated design pass
+if dev-box usage becomes routine rather than occasional.

@@ -54,6 +54,15 @@ completeness.
 Tear down anything you started (`docker compose down` without `-v`). Track what was already running
 before you began.
 
+## The Hetzner dev box is not your call
+
+Provisioning or connecting to the dev box (`infrastructure/dev-box/dev-up.sh`, `hcloud`, or `ssh
+kafka-dev-box`) is off-limits on your own initiative, even though nothing stops you technically. If
+local resource exhaustion blocks you and scoping the rebuild to the touched service doesn't fix it,
+stop and report rather than reaching for Hetzner yourself — using the dev box is a decision the
+orchestrator makes when writing the delegation brief. See `docs/workflow/agent-workflow.md`'s
+dev-box usage policy under "Delegate."
+
 ## Report
 
 File your report per the `agent-report` contract before your turn ends.
