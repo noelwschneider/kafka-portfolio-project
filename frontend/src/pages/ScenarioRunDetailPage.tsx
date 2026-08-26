@@ -6,6 +6,7 @@ import {
   listScenarios,
   scenarioRunStreamUrl,
   type ScenarioRun,
+  type ScenarioRunStatus,
   type ScenarioTimelineEntry,
 } from '../api/scenarios';
 import { getOrder } from '../api/orders';
@@ -244,6 +245,15 @@ export function ScenarioRunDetailPage({ runId, onBack }: Props) {
     revealedCountRef.current = 0;
   }, [runId]);
 
+  // Apply each SSE message to the cached run directly instead of refetching the whole run document
+  // per message. The stream already carries the full ScenarioTimelineEntry / run-status payload, so a
+  // refetch asks the server to re-send everything already held plus one new entry.
+  //
+  // That distinction only matters at Scenario 8's scale, which is why it survived every other
+  // scenario: a high-volume run emits ~520 timeline entries in a few seconds, and one refetch per
+  // entry is O(n^2) — ~520 requests for a document growing to ~140KB, i.e. tens of MB of JSON parsed
+  // and a ~520-item list re-rendered ~520 times, which is what froze the page live on the demo box.
+  // A ten-entry scenario emits ten small refetches and looks fine either way.
   useEffect(() => {
     setStreamState('connecting');
     const url = scenarioRunStreamUrl(runId);
@@ -251,9 +261,45 @@ export function ScenarioRunDetailPage({ runId, onBack }: Props) {
       url,
       {
         onOpen: () => setStreamState('live'),
-        onMessage: () => {
+        onMessage: (eventName, data) => {
           setStreamState('live');
-          queryClient.invalidateQueries({ queryKey: ['scenario-run', runId] });
+          let parsed: unknown;
+          try {
+            parsed = JSON.parse(data);
+          } catch {
+            // Malformed frame: fall back to the authoritative fetch rather than dropping the update.
+            queryClient.invalidateQueries({ queryKey: ['scenario-run', runId] });
+            return;
+          }
+          queryClient.setQueryData<ScenarioRun>(['scenario-run', runId], (current) => {
+            if (!current) return current;
+            if (eventName === 'timeline-entry') {
+              const entry = parsed as ScenarioTimelineEntry;
+              // The server assigns a unique, monotonic sequence per run; ignore a duplicate rather
+              // than rendering the same entry twice if EventSource replays after a reconnect.
+              if (current.timeline.some((e) => e.sequence === entry.sequence)) return current;
+              return {
+                ...current,
+                timeline: [...current.timeline, entry].sort((a, b) => a.sequence - b.sequence),
+              };
+            }
+            if (eventName === 'run-status') {
+              const status = parsed as { status: ScenarioRunStatus; orderId: string; completedAt: string };
+              return {
+                ...current,
+                status: status.status,
+                // RunEventHub sends '' rather than null for these two when absent.
+                orderId: status.orderId === '' ? current.orderId : status.orderId,
+                completedAt: status.completedAt === '' ? current.completedAt : status.completedAt,
+              };
+            }
+            return current;
+          });
+          if (eventName === 'run-status') {
+            // The run is terminal: one authoritative fetch reconciles anything the stream missed
+            // (elapsedMs and errorMessage are not carried on the run-status frame) — once, not per entry.
+            queryClient.invalidateQueries({ queryKey: ['scenario-run', runId] });
+          }
         },
         onError: () => setStreamState((s) => (s === 'live' ? s : 'unavailable')),
       },
