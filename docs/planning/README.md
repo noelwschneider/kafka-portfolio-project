@@ -21,9 +21,9 @@ relevant) its own design/roadmap docs the way `sprint-1/` did for the original M
 
 ### `sprint-1/` — MVP build (Phase 0–11, complete)
 
-The original pre-implementation design docs for the MVP, split from a single draft (preserved at
-[`../_old/order-fulfillment-systems-lab-action-plan.md`](../_old/order-fulfillment-systems-lab-action-plan.md)).
-**Treat these as a frozen historical record of how the MVP was designed and built** — they describe
+The original pre-implementation design docs for the MVP, split from a single draft. That draft exists
+only in the author's local history (`_old/` is gitignored and was never committed) — it does not ship
+with the repository. **Treat these as a frozen historical record of how the MVP was designed and built** — they describe
 the system as it was planned pre-implementation, not a living spec. Prefer the frozen contracts
 (`docs/openapi/`, `docs/events/`, `docs/order-state-machine.md`, `docs/db-ownership.md`,
 `docs/adr/`) or the current code over re-deriving shapes from this prose.

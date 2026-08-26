@@ -7,6 +7,8 @@
 __pycache__/
 
 */_old/
+docs/external/
+docs/study-guide/
 
 # Maven build output (previously a per-module services/monolith/.gitignore before Phase 3 split
 # the monolith into services/{common,order-service,inventory-service,payment-service,fulfillment-service}/)

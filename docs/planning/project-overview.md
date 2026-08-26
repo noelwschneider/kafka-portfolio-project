@@ -33,7 +33,7 @@ A conventional "fake storefront" should exist only to the extent required to est
 
 Frontend development will be done in VS Code. Backend development will be done in JetBrains IntelliJ Ultimate.
 
-This document, along with its 6 companion architecture/product docs, defines **what** to build and **why**. For **who builds it, in what order, with which Claude model/effort tier, and using what tooling**, see [`execution-plan.md`](execution-plan.md) — the operational reference for AI agent execution. See [`README.md`](README.md) for the full doc index and reading order.
+This document, along with its 6 companion architecture/product docs, defines **what** to build and **why**. For **who builds it, in what order, with which Claude model/effort tier, and using what tooling**, see [`sprint-1/execution-plan.md`](sprint-1/execution-plan.md) — the operational reference for AI agent execution. See [`README.md`](README.md) for the full doc index and reading order.
 
 ---
 
