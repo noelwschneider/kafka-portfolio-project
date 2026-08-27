@@ -84,6 +84,14 @@ a:visited {
   color: #fff;
 }
 
+.app-nav-link:visited {
+  color: var(--text);
+}
+
+.app-nav-link.active:visited {
+  color: #fff;
+}
+
 .page-header {
   display: flex;
   align-items: center;
@@ -356,13 +364,13 @@ td {
 
 .scenario-card {
   border: 1px solid var(--border);
-  border-top: 3px solid var(--accent);
+  border-left: 3px solid var(--accent);
   border-radius: 8px;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  background: var(--bg-alt);
+  background: color-mix(in srgb, var(--accent) 5%, var(--bg-alt));
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
