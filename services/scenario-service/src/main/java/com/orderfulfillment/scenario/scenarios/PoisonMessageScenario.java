@@ -26,6 +26,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class PoisonMessageScenario extends AbstractScenarioRunner {
 
+    /** Names the synthetic order this scenario's malformed event references. Not tied to a real
+     * {@code POST /api/orders} call — see the class Javadoc — but the id still lands in the projected
+     * event record, so it reads unmistakably wherever it surfaces. */
+    private static final String CUSTOMER_NAME = "Percy Poison";
+
     public PoisonMessageScenario(ScenarioToolkit toolkit) {
         super(toolkit);
     }
@@ -40,7 +45,7 @@ public class PoisonMessageScenario extends AbstractScenarioRunner {
         String syntheticOrderId = "poison-" + UUID.randomUUID().toString().substring(0, 8);
         Map<String, Object> incompletePayload = new LinkedHashMap<>();
         incompletePayload.put("orderId", syntheticOrderId);
-        incompletePayload.put("customerId", "demo-customer");
+        incompletePayload.put("customerId", CUSTOMER_NAME);
         // "items" deliberately omitted — this is the unprocessable part of the record.
 
         EventEnvelope<Map<String, Object>> envelope = new EventEnvelope<>(

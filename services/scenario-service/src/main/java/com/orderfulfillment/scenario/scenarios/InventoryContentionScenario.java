@@ -53,7 +53,7 @@ public class InventoryContentionScenario extends AbstractScenarioRunner {
     }
 
     private OrderServiceClient.OrderCreationResult createOnThisCorrelation(ScenarioRunContext ctx) {
-        return runOnThisCorrelation(ctx, () -> createOrder(ctx.runId(), "SKU-004", 2, "demo-customer"));
+        return runOnThisCorrelation(ctx, () -> createOrder(ctx.runId(), "SKU-004", 2, "Cara Contention"));
     }
 
     private void watchOnThisCorrelation(ScenarioRunContext ctx, String orderId) {

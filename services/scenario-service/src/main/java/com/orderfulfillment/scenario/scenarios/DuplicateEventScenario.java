@@ -21,6 +21,9 @@ public class DuplicateEventScenario extends AbstractScenarioRunner {
     private static final int PROJECTION_POLL_ATTEMPTS = 40;
     private static final long PROJECTION_POLL_INTERVAL_MS = 250L;
 
+    /** Names the order this scenario creates so it reads unmistakably on the Orders page. */
+    private static final String CUSTOMER_NAME = "Dana Duplicate";
+
     public DuplicateEventScenario(ScenarioToolkit toolkit) {
         super(toolkit);
     }
@@ -35,7 +38,7 @@ public class DuplicateEventScenario extends AbstractScenarioRunner {
         recordHttp(ctx.runId(), "PUT /demo/payment-behavior", paymentServiceClient.setBehavior("DEFAULT_SUCCESS"));
 
         OrderServiceClient.OrderCreationResult order =
-                createOrder(ctx.runId(), "SKU-001", 2, "demo-customer");
+                createOrder(ctx.runId(), "SKU-001", 2, CUSTOMER_NAME);
         ctx.setPrimaryOrderId().accept(order.orderId());
 
         EventRecordEntity orderCreated = awaitProjectedOrderCreated(ctx, order.orderId());

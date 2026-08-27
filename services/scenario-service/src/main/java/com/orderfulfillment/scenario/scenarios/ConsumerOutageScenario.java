@@ -15,6 +15,9 @@ public class ConsumerOutageScenario extends AbstractScenarioRunner {
 
     private static final String LISTENER_ID = "order-created";
 
+    /** Names the order this scenario creates so it reads unmistakably on the Orders page. */
+    private static final String CUSTOMER_NAME = "Olive Outage";
+
     private final ScenarioProperties properties;
 
     public ConsumerOutageScenario(ScenarioToolkit toolkit, ScenarioProperties properties) {
@@ -34,7 +37,7 @@ public class ConsumerOutageScenario extends AbstractScenarioRunner {
                 consumerControlClient.pauseInventoryConsumer(LISTENER_ID));
 
         OrderServiceClient.OrderCreationResult order =
-                createOrder(ctx.runId(), "SKU-001", 1, "demo-customer");
+                createOrder(ctx.runId(), "SKU-001", 1, CUSTOMER_NAME);
         ctx.setPrimaryOrderId().accept(order.orderId());
 
         sleep(properties.consumerOutagePauseMs());
