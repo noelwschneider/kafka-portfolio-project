@@ -893,6 +893,54 @@ td {
   font-variant-numeric: tabular-nums;
 }
 
+.orders-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.orders-filters,
+.order-id-lookup {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.orders-filters label,
+.order-id-lookup label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.orders-filters select,
+.orders-filters input,
+.order-id-lookup input {
+  font: inherit;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  color: var(--text-h);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.pagination-status {
+  opacity: 0.75;
+  font-size: 13px;
+}
+
 .empty-state {
   border: 1px dashed var(--border);
   border-radius: 8px;
