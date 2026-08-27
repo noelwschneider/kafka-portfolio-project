@@ -65,49 +65,51 @@ function TimelineEntryDetail({
   const extraKeys = detail ? Object.keys(detail).filter((k) => !knownKeys.has(k)) : [];
 
   return (
-    <li className={`timeline-entry timeline-${entry.kind.toLowerCase()} timeline-reveal${revealed ? ' timeline-revealed' : ''}`}>
-      <div className="timeline-row">
-        <span
-          className={`timeline-service-badge${service ? ` service-${service}` : ' service-none'}`}
-          title={service ? SERVICE_LABELS[service] : 'No single-service attribution'}
-        >
-          {service && <ServiceIcon service={service} />}
-        </span>
-        <span className="timeline-time">{new Date(entry.occurredAt).toLocaleTimeString(undefined, { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}.{new Date(entry.occurredAt).getMilliseconds().toString().padStart(3, '0')}</span>
-        <div className="timeline-main">
-          <span className="timeline-title">{title}</span>
-          <span className="timeline-headline">{headline}</span>
-          <span className="timeline-raw">
-            <span className="timeline-kind">{entry.kind}</span>
-            <span className="timeline-label">{entry.label}</span>
-          </span>
-          {demonstrates.length > 0 && (
-            <ul className="timeline-demonstrates">
-              {demonstrates.map((point) => (
-                <li key={point}>{point}</li>
-              ))}
-            </ul>
-          )}
+    <li className={`timeline-entry-row timeline-reveal${revealed ? ' timeline-revealed' : ''}`}>
+      <span
+        className={`timeline-service-badge${service ? ` service-${service}` : ' service-none'}`}
+        title={service ? SERVICE_LABELS[service] : 'No single-service attribution'}
+      >
+        {service && <ServiceIcon service={service} />}
+      </span>
+      <div className={`timeline-card timeline-${entry.kind.toLowerCase()}`}>
+        <div className="timeline-row">
+          <span className="timeline-time">{new Date(entry.occurredAt).toLocaleTimeString(undefined, { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}.{new Date(entry.occurredAt).getMilliseconds().toString().padStart(3, '0')}</span>
+          <div className="timeline-main">
+            <span className="timeline-title">{title}</span>
+            <span className="timeline-headline">{headline}</span>
+            <span className="timeline-raw">
+              <span className="timeline-kind">{entry.kind}</span>
+              <span className="timeline-label">{entry.label}</span>
+            </span>
+            {demonstrates.length > 0 && (
+              <ul className="timeline-demonstrates">
+                {demonstrates.map((point) => (
+                  <li key={point}>{point}</li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
-      </div>
-      {hasDetail && (
-        <dl className="timeline-detail">
-          {KNOWN_DETAIL_FIELDS.filter((f) => detail && detail[f.key] !== undefined && detail[f.key] !== null).map(
-            (f) => (
-              <div key={f.key} className="timeline-detail-row">
-                <dt>{f.label}</dt>
-                <dd>{String((detail as Record<string, unknown>)[f.key])}</dd>
+        {hasDetail && (
+          <dl className="timeline-detail">
+            {KNOWN_DETAIL_FIELDS.filter((f) => detail && detail[f.key] !== undefined && detail[f.key] !== null).map(
+              (f) => (
+                <div key={f.key} className="timeline-detail-row">
+                  <dt>{f.label}</dt>
+                  <dd>{String((detail as Record<string, unknown>)[f.key])}</dd>
+                </div>
+              ),
+            )}
+            {extraKeys.map((k) => (
+              <div key={k} className="timeline-detail-row">
+                <dt>{k}</dt>
+                <dd>{String((detail as Record<string, unknown>)[k])}</dd>
               </div>
-            ),
-          )}
-          {extraKeys.map((k) => (
-            <div key={k} className="timeline-detail-row">
-              <dt>{k}</dt>
-              <dd>{String((detail as Record<string, unknown>)[k])}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
+            ))}
+          </dl>
+        )}
+      </div>
     </li>
   );
 }
@@ -128,9 +130,9 @@ function TimelineFlowConnector({ from, to, label }: { from: ServiceKey; to: Serv
       <span className="timeline-connector-arrow">
         {label && <span className="timeline-connector-label">{label}</span>}
         <span className="timeline-connector-line">&#8594;</span>
-      </span>
-      <span className={`timeline-service-badge service-${to}`}>
-        <ServiceIcon service={to} />
+        <span className={`timeline-service-badge service-${to}`}>
+          <ServiceIcon service={to} />
+        </span>
       </span>
     </li>
   );

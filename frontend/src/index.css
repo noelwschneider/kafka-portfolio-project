@@ -14,14 +14,13 @@
   --expected: #bfffff;
   --expected-bg: color-mix(in srgb, var(--expected) 20%, var(--bg));
 
-  /* Service identity, for #57's scenario-run flow visualization. Chosen to stay clearly outside
-     the hues already claimed above (green x2, coral-red, peach, pale cyan): blue, violet, taupe,
-     teal — distinct enough for the pairs that actually sit adjacent in a typical scenario flow
-     (order->payment, payment->inventory, inventory->fulfillment). */
-  --color-service-order: #3454a8;
-  --color-service-payment: #8b5fbf;
-  --color-service-inventory: #8a7355;
-  --color-service-fulfillment: #2389a8;
+  /* Service identity, for #57's scenario-run flow visualization: blue, violet, tan, teal. Lightened
+     from an earlier, darker pass per developer feedback during live review — resemblance to the
+     semantic palette above is fine, brightness/legibility took priority over hue separation. */
+  --color-service-order: #5d82d1;
+  --color-service-payment: #a875d6;
+  --color-service-inventory: #c99b5f;
+  --color-service-fulfillment: #3db6c9;
 
   font: 15px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
   color-scheme: light dark;
@@ -452,7 +451,18 @@ td {
   gap: 2px;
 }
 
-.timeline-entry {
+/* #57's rail layout: the service badge sits outside the bordered card, in its own left column, so
+   every icon down the page lines up in one straight rail instead of being embedded inside each
+   card's own padding. */
+.timeline-entry-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.timeline-card {
+  flex: 1;
+  min-width: 0;
   border: 1px solid var(--border);
   border-radius: 6px;
   overflow: hidden;
@@ -615,12 +625,14 @@ td {
   background: color-mix(in srgb, var(--color-service-fulfillment) 12%, var(--bg));
 }
 
+/* No left margin: its first badge sits in the same column as .timeline-entry-row's badge (both are
+   direct children of the same .timeline list with nothing to its left), so the connector continues
+   the same rail rather than needing a hand-tuned offset to line up with it. */
 .timeline-connector {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 12px 4px 12px;
-  margin-left: 45px;
+  padding: 4px 12px;
 }
 
 .timeline-connector-arrow {
