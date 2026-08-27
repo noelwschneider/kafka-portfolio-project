@@ -123,7 +123,13 @@ def verification_has_evidence(text: str) -> bool:
 def main() -> int:
     payload = read_payload()
 
-    project_raw = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or ""
+    # An agent working in its own git worktree (a different directory from the orchestrating
+    # session's) must be checked against *its own* docs/agent-reports/, not the main checkout's -
+    # otherwise a correctly-committed report on the agent's own branch never satisfies this gate,
+    # and the agent ends up writing a redundant, untracked duplicate into the main checkout just to
+    # pass. payload["cwd"] is the agent's actual working directory; CLAUDE_PROJECT_DIR is the
+    # orchestrating session's fixed project dir and is used only when the payload has none.
+    project_raw = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or ""
     if not project_raw:
         return 0
     project = Path(project_raw)

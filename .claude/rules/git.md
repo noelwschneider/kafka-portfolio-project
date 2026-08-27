@@ -52,6 +52,24 @@ This exists because pushing straight to `main` means CI runs asynchronously afte
 watching — that is exactly how Sprint 7's own CI failure went unnoticed until the developer caught it
 manually. Branch protection makes checking CI a gate the merge step cannot skip, not a step to remember.
 
+## Before merging, confirm the PR's base is actually the intended target
+
+`gh pr merge` merges a PR into *its own base branch* — not necessarily `main`, and it reports success
+whether or not that base was what you meant. Before running `gh pr merge`, check `gh pr view <n>
+--json baseRefName` and confirm it names the branch you actually intend the work to land on. This
+matters most for a PR that was ever part of a stacked chain (one PR based on another's branch instead
+of `main`) — if an earlier link in the chain gets closed, retargeted, or its branch deleted, a later
+PR's base can silently stay pointed at a branch that no longer serves its original purpose, and
+merging it there instead of `main` "succeeds" without anyone noticing.
+
+**After merging, verify the merged content is actually reachable from the target** — don't trust
+`gh pr merge`'s reported success, `gh pr view --json state` showing `MERGED`, or a board status update
+as proof. A cheap direct check: `git cat-file -e origin/<target>:<a file the PR added>`. This is not
+paranoia for its own sake — Sprint 8 closed a PR whose base had drifted to a since-deleted
+intermediate branch this way, discovered only because the merge commit turned out to be unreachable
+from `main` when checked directly; every other merge that session was re-verified the same way after
+the fact specifically because this one wasn't caught until after.
+
 ## Merges and deployments are the developer-facing session's job, never a subagent's
 
 A `PreToolUse` hook (`.claude/hooks/block-subagent-merge-deploy.py`) mechanically blocks any subagent
