@@ -87,7 +87,7 @@ work of Sprint 5. All six goals shipped. See
 |---|---|
 | [`sprint-6/sprint-6-plan.md`](sprint-6/sprint-6-plan.md) | This sprint's goals, sequencing, and closing state |
 
-### `sprint-7/` — workflow and process hardening (current)
+### `sprint-7/` — workflow and process hardening (complete)
 
 Theme: how the project itself is run, not the application — closing demonstrated process gaps in
 delegated-agent infrastructure usage and production deploys, plus retrospective audits of bug
@@ -97,6 +97,19 @@ regardless of theme. See [`sprint-7/sprint-7-plan.md`](sprint-7/sprint-7-plan.md
 | File | What's in it |
 |---|---|
 | [`sprint-7/sprint-7-plan.md`](sprint-7/sprint-7-plan.md) | This sprint's goals, sequencing, developer-involvement checkpoints, and dependencies |
+
+### `sprint-8/` — frontend visual/UX upgrade (current)
+
+Theme: making the UI genuinely appealing, not just functionally polished (Sprint 4) or
+recruiter-legible (Sprint 6) — a new site theme built interactively with the developer, a shared
+frontend styling contract to keep concurrent visual work from colliding, a graphical service/topic
+flow indicator on the scenario-run timeline, and an Orders-page batch (pagination, filtering/lookup,
+per-scenario customer names). One Tier 1 bug fix carried in regardless of theme, per Sprint 7's own
+precedent. See [`sprint-8/sprint-8-plan.md`](sprint-8/sprint-8-plan.md) for the full plan.
+
+| File | What's in it |
+|---|---|
+| [`sprint-8/sprint-8-plan.md`](sprint-8/sprint-8-plan.md) | This sprint's goals, sequencing, developer-involvement checkpoints, and dependencies |
 
 ## Cross-reference note
 
