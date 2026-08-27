@@ -12,7 +12,7 @@ import {
 import { getOrder } from '../api/orders';
 import { subscribeToStream } from '../api/client';
 import { narrateTimelineEntry } from '../lib/scenarioNarrative';
-import { attributeService, flowRoutingLabel, SERVICE_LABELS, type ServiceKey } from '../lib/scenarioFlow';
+import { attributeService, flowRoutingLabel, SERVICE_KEYS, SERVICE_LABELS, type ServiceKey } from '../lib/scenarioFlow';
 import { ServiceIcon } from '../components/ServiceIcon';
 import { LoadingHint } from '../components/LoadingHint';
 
@@ -66,11 +66,13 @@ function TimelineEntryDetail({
 
   return (
     <li className={`timeline-entry-row timeline-reveal${revealed ? ' timeline-revealed' : ''}`}>
-      <span
-        className={`timeline-service-badge${service ? ` service-${service}` : ' service-none'}`}
-        title={service ? SERVICE_LABELS[service] : 'No single-service attribution'}
-      >
-        {service && <ServiceIcon service={service} />}
+      <span className="timeline-rail">
+        <span
+          className={`timeline-service-badge${service ? ` service-${service}` : ' service-none'}`}
+          title={service ? SERVICE_LABELS[service] : 'No single-service attribution'}
+        >
+          {service && <ServiceIcon service={service} />}
+        </span>
       </span>
       <div className={`timeline-card timeline-${entry.kind.toLowerCase()}`}>
         <div className="timeline-row">
@@ -114,27 +116,41 @@ function TimelineEntryDetail({
   );
 }
 
-// The graphical flow layer, issue #57: a symbol per service plus an arrow to the next service,
-// labeled with the topic/endpoint that hop routed through. Rendered as its own <li> between two
-// timeline rows whenever the service attribution actually changes — skipping over STATE_CHANGE (and
-// any other unattributed) entries in between rather than treating them as a break in the chain, since
-// they don't represent a different service having done anything. The label comes from the arriving
-// entry's own topic/endpoint (flowRoutingLabel), since that's literally what "routed through" this
-// hop — not fabricated, just the same field already shown in the detail rows below.
-function TimelineFlowConnector({ from, to, label }: { from: ServiceKey; to: ServiceKey; label: string | null }) {
+// The graphical flow layer, issue #57: the topic/endpoint a hop routed through, rendered as its own
+// <li> between two timeline rows whenever the service attribution actually changes — skipping over
+// STATE_CHANGE (and any other unattributed) entries in between rather than treating them as a break
+// in the chain, since they don't represent a different service having done anything. The label comes
+// from the arriving entry's own topic/endpoint (flowRoutingLabel), since that's literally what
+// "routed through" this hop — not fabricated, just the same field already shown in the detail rows
+// below.
+//
+// No icon and no arrow of its own — the departing service's icon is already visible immediately
+// above and the arriving service's icon immediately below, and which way the flow reads is already
+// unambiguous from the timestamps on each entry, so a direction marker here would be redundant. The
+// connecting line itself (drawn on .timeline-connector directly, not a nested .timeline-rail — see
+// index.css) still runs straight through this row, same as every other.
+function TimelineFlowConnector({ label }: { label: string | null }) {
   return (
     <li className="timeline-connector" aria-hidden="true">
-      <span className={`timeline-service-badge service-${from}`}>
-        <ServiceIcon service={from} />
-      </span>
-      <span className="timeline-connector-arrow">
-        {label && <span className="timeline-connector-label">{label}</span>}
-        <span className="timeline-connector-line">&#8594;</span>
-        <span className={`timeline-service-badge service-${to}`}>
-          <ServiceIcon service={to} />
-        </span>
-      </span>
+      {label && <span className="timeline-connector-label">{label}</span>}
     </li>
+  );
+}
+
+// A permanent icon->service key, not just a hover title, so the four symbols don't have to be
+// memorized (or hovered one at a time) to read the timeline below. Shown once, above the list.
+function ServiceIconLegend() {
+  return (
+    <div className="timeline-legend">
+      {SERVICE_KEYS.map((service) => (
+        <span key={service} className="timeline-legend-item">
+          <span className={`timeline-service-badge service-${service}`}>
+            <ServiceIcon service={service} />
+          </span>
+          {SERVICE_LABELS[service]}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -468,6 +484,7 @@ export function ScenarioRunDetailPage({ runId, onBack }: Props) {
           </div>
 
           <h3>Timeline</h3>
+          {data.timeline.length > 0 && <ServiceIconLegend />}
           {data.timeline.length === 0 && <p>No timeline entries yet.</p>}
           {data.timeline.length > 0 && (
             <ol className="timeline">
@@ -480,8 +497,6 @@ export function ScenarioRunDetailPage({ runId, onBack }: Props) {
                     rows.push(
                       <TimelineFlowConnector
                         key={`connector-${entry.sequence}`}
-                        from={lastService}
-                        to={service}
                         label={flowRoutingLabel(entry)}
                       />,
                     );

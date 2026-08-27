@@ -27,6 +27,9 @@ export function ServiceIcon({ service }: { service: ServiceKey }) {
       return (
         <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
           <circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+          {/* SVG <text> gets a native text-selection cursor by default in most browsers, unlike
+              <path>/<rect>/<circle> — pointer-events:none makes it purely decorative like the rest
+              of these icons, so hovering it shows the normal cursor instead of an I-beam. */}
           <text
             x="8"
             y="11"
@@ -35,6 +38,7 @@ export function ServiceIcon({ service }: { service: ServiceKey }) {
             fontWeight="700"
             fill="currentColor"
             fontFamily="ui-monospace, 'SF Mono', Menlo, monospace"
+            style={{ pointerEvents: 'none' }}
           >
             $
           </text>
