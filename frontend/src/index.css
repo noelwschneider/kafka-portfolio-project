@@ -571,6 +571,79 @@ td {
   border: 1px solid var(--border);
 }
 
+/* #57's flow layer: a color-coded service badge on every timeline row, plus a connector row between
+   two entries whenever the attributed service actually changes. Sits alongside the existing
+   .timeline-detail rows (unchanged) as the at-a-glance view, not a replacement for them. */
+.timeline-service-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  opacity: 0.9;
+}
+
+.timeline-service-badge.service-none {
+  visibility: hidden;
+}
+
+.timeline-service-badge.service-order {
+  color: var(--color-service-order);
+  border-color: var(--color-service-order);
+  background: color-mix(in srgb, var(--color-service-order) 12%, var(--bg));
+}
+
+.timeline-service-badge.service-payment {
+  color: var(--color-service-payment);
+  border-color: var(--color-service-payment);
+  background: color-mix(in srgb, var(--color-service-payment) 12%, var(--bg));
+}
+
+.timeline-service-badge.service-inventory {
+  color: var(--color-service-inventory);
+  border-color: var(--color-service-inventory);
+  background: color-mix(in srgb, var(--color-service-inventory) 12%, var(--bg));
+}
+
+.timeline-service-badge.service-fulfillment {
+  color: var(--color-service-fulfillment);
+  border-color: var(--color-service-fulfillment);
+  background: color-mix(in srgb, var(--color-service-fulfillment) 12%, var(--bg));
+}
+
+.timeline-connector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 12px;
+  margin-left: 45px;
+}
+
+.timeline-connector-arrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.timeline-connector-line {
+  font-size: 14px;
+  opacity: 0.5;
+}
+
+.timeline-connector-label {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+  opacity: 0.65;
+  padding: 1px 6px;
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+}
+
 .scenario-context {
   margin: 8px 0 16px;
   padding: 10px 14px;

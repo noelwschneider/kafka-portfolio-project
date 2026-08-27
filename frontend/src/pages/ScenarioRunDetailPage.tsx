@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
@@ -12,6 +12,8 @@ import {
 import { getOrder } from '../api/orders';
 import { subscribeToStream } from '../api/client';
 import { narrateTimelineEntry } from '../lib/scenarioNarrative';
+import { attributeService, flowRoutingLabel, SERVICE_LABELS, type ServiceKey } from '../lib/scenarioFlow';
+import { ServiceIcon } from '../components/ServiceIcon';
 import { LoadingHint } from '../components/LoadingHint';
 
 interface Props {
@@ -48,10 +50,12 @@ function TimelineEntryDetail({
   entry,
   revealed,
   demonstrates,
+  service,
 }: {
   entry: ScenarioTimelineEntry;
   revealed: boolean;
   demonstrates: string[];
+  service: ServiceKey | null;
 }) {
   const detail = entry.detail;
   const hasDetail = detail && Object.keys(detail).length > 0;
@@ -63,6 +67,12 @@ function TimelineEntryDetail({
   return (
     <li className={`timeline-entry timeline-${entry.kind.toLowerCase()} timeline-reveal${revealed ? ' timeline-revealed' : ''}`}>
       <div className="timeline-row">
+        <span
+          className={`timeline-service-badge${service ? ` service-${service}` : ' service-none'}`}
+          title={service ? SERVICE_LABELS[service] : 'No single-service attribution'}
+        >
+          {service && <ServiceIcon service={service} />}
+        </span>
         <span className="timeline-time">{new Date(entry.occurredAt).toLocaleTimeString(undefined, { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}.{new Date(entry.occurredAt).getMilliseconds().toString().padStart(3, '0')}</span>
         <div className="timeline-main">
           <span className="timeline-title">{title}</span>
@@ -98,6 +108,30 @@ function TimelineEntryDetail({
           ))}
         </dl>
       )}
+    </li>
+  );
+}
+
+// The graphical flow layer, issue #57: a symbol per service plus an arrow to the next service,
+// labeled with the topic/endpoint that hop routed through. Rendered as its own <li> between two
+// timeline rows whenever the service attribution actually changes — skipping over STATE_CHANGE (and
+// any other unattributed) entries in between rather than treating them as a break in the chain, since
+// they don't represent a different service having done anything. The label comes from the arriving
+// entry's own topic/endpoint (flowRoutingLabel), since that's literally what "routed through" this
+// hop — not fabricated, just the same field already shown in the detail rows below.
+function TimelineFlowConnector({ from, to, label }: { from: ServiceKey; to: ServiceKey; label: string | null }) {
+  return (
+    <li className="timeline-connector" aria-hidden="true">
+      <span className={`timeline-service-badge service-${from}`}>
+        <ServiceIcon service={from} />
+      </span>
+      <span className="timeline-connector-arrow">
+        {label && <span className="timeline-connector-label">{label}</span>}
+        <span className="timeline-connector-line">&#8594;</span>
+      </span>
+      <span className={`timeline-service-badge service-${to}`}>
+        <ServiceIcon service={to} />
+      </span>
     </li>
   );
 }
@@ -435,14 +469,34 @@ export function ScenarioRunDetailPage({ runId, onBack }: Props) {
           {data.timeline.length === 0 && <p>No timeline entries yet.</p>}
           {data.timeline.length > 0 && (
             <ol className="timeline">
-              {data.timeline.map((entry, index) => (
-                <TimelineEntryDetail
-                  key={entry.sequence}
-                  entry={entry}
-                  revealed={index < revealedCount}
-                  demonstrates={demonstratesByEntrySequence.get(entry.sequence) ?? []}
-                />
-              ))}
+              {(() => {
+                const rows: ReactElement[] = [];
+                let lastService: ServiceKey | null = null;
+                data.timeline.forEach((entry, index) => {
+                  const service = attributeService(entry);
+                  if (service && lastService && service !== lastService && index < revealedCount) {
+                    rows.push(
+                      <TimelineFlowConnector
+                        key={`connector-${entry.sequence}`}
+                        from={lastService}
+                        to={service}
+                        label={flowRoutingLabel(entry)}
+                      />,
+                    );
+                  }
+                  if (service) lastService = service;
+                  rows.push(
+                    <TimelineEntryDetail
+                      key={entry.sequence}
+                      entry={entry}
+                      revealed={index < revealedCount}
+                      demonstrates={demonstratesByEntrySequence.get(entry.sequence) ?? []}
+                      service={service}
+                    />,
+                  );
+                });
+                return rows;
+              })()}
             </ol>
           )}
         </>
