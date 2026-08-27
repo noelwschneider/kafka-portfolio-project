@@ -14,14 +14,13 @@
   --expected: #bfffff;
   --expected-bg: color-mix(in srgb, var(--expected) 20%, var(--bg));
 
-  /* Service identity, for #57's scenario-run flow visualization. Chosen to stay clearly outside
-     the hues already claimed above (green x2, coral-red, peach, pale cyan): blue, violet, taupe,
-     teal — distinct enough for the pairs that actually sit adjacent in a typical scenario flow
-     (order->payment, payment->inventory, inventory->fulfillment). */
-  --color-service-order: #3454a8;
-  --color-service-payment: #8b5fbf;
-  --color-service-inventory: #8a7355;
-  --color-service-fulfillment: #2389a8;
+  /* Service identity, for #57's scenario-run flow visualization: blue, violet, tan, teal. Lightened
+     from an earlier, darker pass per developer feedback during live review — resemblance to the
+     semantic palette above is fine, brightness/legibility took priority over hue separation. */
+  --color-service-order: #5d82d1;
+  --color-service-payment: #a875d6;
+  --color-service-inventory: #c99b5f;
+  --color-service-fulfillment: #3db6c9;
 
   font: 15px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
   color-scheme: light dark;
@@ -460,7 +459,61 @@ td {
   gap: 2px;
 }
 
-.timeline-entry {
+/* #57's rail layout: the service badge sits outside the bordered card, in its own left column, so
+   every icon down the page lines up in one straight rail instead of being embedded inside each
+   card's own padding. align-items:stretch (not flex-start) so .timeline-rail below stretches to
+   this row's full height regardless of how tall the card ends up. */
+.timeline-entry-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+/* The rail column itself: a fixed-width cell that stretches to its row's full height, drawing a
+   vertical line straight through its own center via ::before. Stacking one of these per
+   .timeline-entry-row is what makes the line look continuous down the whole page — each row only
+   ever has to draw its own segment, never the full list's height, so this keeps working regardless
+   of staged-reveal timing or how many rows there are. (.timeline-connector draws its own line
+   differently — see below — since it stacks its content vertically instead of using this cell.) The
+   badge sits on top at a fixed 22x22 size, top-aligned in the cell, so the border/background is a
+   neat chip rather than stretching to the row's full height too. Extends 1px past its own top/bottom
+   into the 2px gap .timeline puts between <li>s, so consecutive segments overlap enough to close it. */
+.timeline-rail {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  flex: none;
+  width: 22px;
+}
+
+.timeline-rail::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--border);
+}
+
+/* No line above the very first row or below the very last — nothing above/below to connect to.
+   Clipped at 11px (half of the badge's own 22px height), the badge's own vertical center now that
+   it's top-aligned rather than centered — not the row's 50% midpoint, which for a top-aligned badge
+   on a tall card would leave the line starting or ending well away from the badge itself. */
+.timeline > li:first-child .timeline-rail::before {
+  top: 11px;
+}
+
+.timeline > li:last-child .timeline-rail::before {
+  bottom: auto;
+  height: 12px;
+}
+
+.timeline-card {
+  flex: 1;
+  min-width: 0;
   border: 1px solid var(--border);
   border-radius: 6px;
   overflow: hidden;
@@ -577,6 +630,112 @@ td {
   background: var(--expected-bg);
   color: var(--expected);
   border: 1px solid var(--border);
+}
+
+/* #57's flow layer: a color-coded service badge on every timeline row, plus a connector row between
+   two entries whenever the attributed service actually changes. Sits alongside the existing
+   .timeline-detail rows (unchanged) as the at-a-glance view, not a replacement for them. */
+.timeline-service-badge {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  opacity: 0.9;
+}
+
+.timeline-service-badge.service-none {
+  visibility: hidden;
+}
+
+/* Permanent icon->service key shown once above the timeline, so the four symbols read without
+   hovering each one individually (every badge below still carries its own title as a fallback). */
+.timeline-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  /* Matches .timeline-card's own indent (22px rail + 10px gap), not .timeline-rail's — lining up
+     with the cards reads as "this key belongs to the timeline below" without the disorienting effect
+     of sitting at the same x as the rail icons themselves. */
+  padding-left: 32px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.timeline-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.timeline-service-badge.service-order {
+  color: var(--color-service-order);
+  border-color: var(--color-service-order);
+  background: color-mix(in srgb, var(--color-service-order) 12%, var(--bg));
+}
+
+.timeline-service-badge.service-payment {
+  color: var(--color-service-payment);
+  border-color: var(--color-service-payment);
+  background: color-mix(in srgb, var(--color-service-payment) 12%, var(--bg));
+}
+
+.timeline-service-badge.service-inventory {
+  color: var(--color-service-inventory);
+  border-color: var(--color-service-inventory);
+  background: color-mix(in srgb, var(--color-service-inventory) 12%, var(--bg));
+}
+
+.timeline-service-badge.service-fulfillment {
+  color: var(--color-service-fulfillment);
+  border-color: var(--color-service-fulfillment);
+  background: color-mix(in srgb, var(--color-service-fulfillment) 12%, var(--bg));
+}
+
+/* No badge and no arrow — the departing service's icon is already visible on the entry above, the
+   arriving service's on the entry below, and which way the flow reads is already unambiguous from
+   each entry's own timestamp, so a direction marker here was redundant. This row draws its own
+   connecting line directly (rather than nesting a .timeline-rail), at the same x every rail centers
+   its line on (11px = half of the 22px badge width), spanning the row's actual height so it still
+   joins the line above to the line below without a gap. The label — the only real content here —
+   starts flush at this row's own left edge, the same x the icons themselves start at. */
+.timeline-connector {
+  position: relative;
+  display: flex;
+  padding: 2px 0;
+}
+
+.timeline-connector::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  left: 11px;
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--border);
+}
+
+/* Info color (--expected), matching how this app already uses it elsewhere (the "Expected terminal
+   status" pill, the homepage's benign "no data" state) — not a new color, the existing info role. */
+.timeline-connector-label {
+  position: relative;
+  z-index: 1;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+  padding: 1px 6px;
+  color: var(--expected);
+  border: 1px dashed var(--expected);
+  border-radius: 999px;
+  background: var(--expected-bg);
 }
 
 .scenario-context {
