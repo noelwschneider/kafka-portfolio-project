@@ -12,6 +12,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class PaymentFailureScenario extends AbstractScenarioRunner {
 
+    /** Names the order this scenario creates so it reads unmistakably on the Orders page. */
+    private static final String CUSTOMER_NAME = "Frank Failure";
+
     public PaymentFailureScenario(ScenarioToolkit toolkit) {
         super(toolkit);
     }
@@ -26,7 +29,7 @@ public class PaymentFailureScenario extends AbstractScenarioRunner {
         recordHttp(ctx.runId(), "PUT /demo/payment-behavior", paymentServiceClient.setBehavior("REJECT"));
         try {
             OrderServiceClient.OrderCreationResult order =
-                    createOrder(ctx.runId(), "SKU-001", 1, "demo-customer");
+                    createOrder(ctx.runId(), "SKU-001", 1, CUSTOMER_NAME);
             ctx.setPrimaryOrderId().accept(order.orderId());
 
             orderStatusWatcher.awaitTerminal(ctx.runId(), order.orderId());
