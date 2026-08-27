@@ -86,6 +86,38 @@ Path-filtered CI correctly ran only the `changes` and `frontend` jobs (a `.md` f
   uncommitted changes present before this task started, unrelated to the styling contract, and
   outside this issue's scope. Left them untouched in the working tree exactly as found.
 
+## Incident: shared working directory caused a stray commit on another branch
+
+This session's working directory is shared with at least two other concurrently running agents
+(evidence: unstaged changes to `frontend/src/api/orders.ts`/`OrdersListPage.tsx` when this task
+started, and later to nine `services/scenario-service` files from a different task). While filing
+this report, `git commit` landed on `frontend/orders-pagination-filters-timestamps-hint` instead of
+`docs/frontend-styling-contract` — something switched the shared `HEAD` between my `git add && git
+commit` and the commit actually executing (`git reflog` shows `checkout: moving from
+docs/frontend-styling-contract to frontend/orders-pagination-filters-timestamps-hint` between my two
+commits). That branch then received a real commit from the other agent (`orders: add pagination to
+Orders list`) on top of mine.
+
+I did not rewrite or force-push `frontend/orders-pagination-filters-timestamps-hint` — it's another
+agent's active branch, and resetting/rebasing it out from under concurrent work is a destructive
+operation this session has no business performing. Instead I `git cherry-pick`ed the report commit
+onto `docs/frontend-styling-contract` (clean pick, touched only my file) and pushed that branch,
+which is what PR #59 now reflects correctly (`gh pr view 59 --json commits` shows exactly the two
+expected commits, no extra).
+
+**Residual state the developer should know about:** the local (not-yet-pushed, as of this check)
+branch `frontend/orders-pagination-filters-timestamps-hint` still contains a stray `docs: file agent
+report for frontend styling contract (#54)` commit as an ancestor of its real work. If that branch is
+pushed and PR'd as-is, the stray commit will appear in that PR's history too (harmless — same file
+content lives correctly in this PR as well — but confusing to review). Whoever lands that other
+branch should either drop that one commit via interactive rebase or just note it's a merge artifact
+from a shared checkout, not part of that task's actual change.
+
+This points to a real gap: running multiple agents against the same non-worktree-isolated clone lets
+one agent's `git checkout`/`commit` interleave with another's. Worth considering `isolation:
+"worktree"` (available on the `Agent` tool) or separate clones for any future concurrent delegation
+against this repo.
+
 ## Deliberately not covered
 
 - No final color or spacing values — explicitly deferred to #56 (interactive theme session) per the
