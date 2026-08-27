@@ -34,6 +34,8 @@ const createdAtFormatter = new Intl.DateTimeFormat(undefined, {
   minute: '2-digit',
 });
 
+const PAGE_SIZE = 20;
+
 function sortOrders(orders: OrderSummary[], key: SortKey, dir: SortDir): OrderSummary[] {
   const sorted = [...orders].sort((a, b) => {
     const av = a[key];
@@ -45,9 +47,11 @@ function sortOrders(orders: OrderSummary[], key: SortKey, dir: SortDir): OrderSu
 }
 
 export function OrdersListPage({ onSelectOrder, onOrderCreated, initialCreateOpen = false, onCreateClosed }: Props) {
+  const [page, setPage] = useState(0);
+
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['orders'],
-    queryFn: listOrders,
+    queryKey: ['orders', page],
+    queryFn: () => listOrders({ page, size: PAGE_SIZE }),
     refetchInterval: 4000,
   });
 
@@ -144,6 +148,28 @@ export function OrdersListPage({ onSelectOrder, onOrderCreated, initialCreateOpe
             ))}
           </tbody>
         </table>
+      )}
+
+      {data && data.totalElements > 0 && (
+        <div className="pagination">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={data.page <= 0}
+          >
+            Previous
+          </button>
+          <span className="pagination-status">
+            Page {data.page + 1} of {Math.max(1, data.totalPages)} · {data.totalElements} orders
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage((p) => p + 1)}
+            disabled={data.page + 1 >= data.totalPages}
+          >
+            Next
+          </button>
+        </div>
       )}
 
       {isCreateOpen && (

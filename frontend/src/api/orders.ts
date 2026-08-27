@@ -75,8 +75,14 @@ export function createOrder(request: CreateOrderRequest): Promise<OrderAccepted>
   });
 }
 
-export function listOrders(): Promise<OrderPage> {
-  return apiFetch<OrderPage>(ORDER_SERVICE_BASE_URL, '/api/orders?size=50');
+export interface ListOrdersParams {
+  page?: number;
+  size?: number;
+}
+
+export function listOrders({ page = 0, size = 20 }: ListOrdersParams = {}): Promise<OrderPage> {
+  const params = new URLSearchParams({ page: String(page), size: String(size) });
+  return apiFetch<OrderPage>(ORDER_SERVICE_BASE_URL, `/api/orders?${params.toString()}`);
 }
 
 export function getOrder(orderId: string): Promise<OrderDetail> {

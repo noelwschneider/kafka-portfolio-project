@@ -725,6 +725,18 @@ td {
   font-variant-numeric: tabular-nums;
 }
 
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.pagination-status {
+  opacity: 0.75;
+  font-size: 13px;
+}
+
 .empty-state {
   border: 1px dashed var(--border);
   border-radius: 8px;
