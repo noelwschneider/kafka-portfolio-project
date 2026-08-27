@@ -16,7 +16,6 @@ import { LoadingHint } from '../components/LoadingHint';
 
 interface Props {
   runId: string;
-  onBack: () => void;
 }
 
 const TERMINAL_RUN_STATUSES = new Set(['COMPLETED', 'FAILED']);
@@ -168,7 +167,7 @@ function matchDemonstratesPoint(point: string, timeline: ScenarioTimelineEntry[]
 const REVEAL_STEP_MS = 180;
 const REVEAL_STAGGER_CAP = 12;
 
-export function ScenarioRunDetailPage({ runId, onBack }: Props) {
+export function ScenarioRunDetailPage({ runId }: Props) {
   const queryClient = useQueryClient();
   const [streamState, setStreamState] = useState<'connecting' | 'live' | 'unavailable'>('connecting');
 
@@ -347,7 +346,6 @@ export function ScenarioRunDetailPage({ runId, onBack }: Props) {
     <section>
       <div className="page-header">
         <h1>Scenario run {displayRunId}</h1>
-        <button onClick={onBack}>Back to scenarios</button>
       </div>
 
       <div className={`stream-indicator stream-${streamState}`}>
