@@ -24,7 +24,7 @@ const queryClient = new QueryClient({
 // small, well-understood addition for exactly this — not adopted for its own sake, and nothing
 // else in the app needed lifted global state that would argue for a heavier state library.
 const NAV_ITEMS = [
-  { to: '/', label: 'Overview', end: true },
+  { to: '/', label: 'Home', end: true },
   { to: '/orders', label: 'Orders' },
   { to: '/architecture', label: 'Architecture' },
 ];
@@ -97,10 +97,9 @@ function OrderDetailRoute() {
 }
 
 function ScenarioRunDetailRoute() {
-  const navigate = useNavigate();
   const runId = useParamOrRedirect('runId', '/scenarios');
   if (!runId) return null;
-  return <ScenarioRunDetailPage runId={runId} onBack={() => navigate('/scenarios')} />;
+  return <ScenarioRunDetailPage runId={runId} />;
 }
 
 // Small helper: react-router's useParams is typed as possibly-undefined; every detail route in
