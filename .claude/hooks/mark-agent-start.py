@@ -20,7 +20,9 @@ def main() -> int:
     if not agent_id or "/" in agent_id or agent_id.startswith("."):
         return 0
 
-    project = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or ""
+    # Must match require-agent-report.py's resolution exactly, or the stop gate looks for this
+    # mark in a different directory than the one it was written to. See that file's comment.
+    project = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or ""
     if not project:
         return 0
 
