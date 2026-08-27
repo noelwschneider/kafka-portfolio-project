@@ -7,6 +7,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class OutOfStockScenario extends AbstractScenarioRunner {
 
+    /** Names the order this scenario creates so it reads unmistakably on the Orders page. */
+    private static final String CUSTOMER_NAME = "Otto Outofstock";
+
     public OutOfStockScenario(ScenarioToolkit toolkit) {
         super(toolkit);
     }
@@ -19,7 +22,7 @@ public class OutOfStockScenario extends AbstractScenarioRunner {
     @Override
     public void run(ScenarioRunContext ctx) {
         OrderServiceClient.OrderCreationResult order =
-                createOrder(ctx.runId(), "SKU-004", 5, "demo-customer");
+                createOrder(ctx.runId(), "SKU-004", 5, CUSTOMER_NAME);
         ctx.setPrimaryOrderId().accept(order.orderId());
 
         orderStatusWatcher.awaitTerminal(ctx.runId(), order.orderId());
