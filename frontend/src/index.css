@@ -14,6 +14,15 @@
   --expected: #bfffff;
   --expected-bg: color-mix(in srgb, var(--expected) 20%, var(--bg));
 
+  /* Service identity, for #57's scenario-run flow visualization. Chosen to stay clearly outside
+     the hues already claimed above (green x2, coral-red, peach, pale cyan): blue, violet, taupe,
+     teal — distinct enough for the pairs that actually sit adjacent in a typical scenario flow
+     (order->payment, payment->inventory, inventory->fulfillment). */
+  --color-service-order: #3454a8;
+  --color-service-payment: #8b5fbf;
+  --color-service-inventory: #8a7355;
+  --color-service-fulfillment: #2389a8;
+
   font: 15px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
   color-scheme: light dark;
   color: var(--text);
