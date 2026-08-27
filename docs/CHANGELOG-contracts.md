@@ -13,6 +13,28 @@ Newest first. Each entry states what changed, why, who is affected, and what the
 
 ---
 
+## 2026-08-27 — `scenarios.md`: Scenario 7 and 8 now document their stock-restore step
+
+**Changed by:** Sprint 8 review, following up on issue #46/PR #47 (Scenario 8) and issue #52/PR #63
+(Scenario 7).
+
+**What changed.** Both scenarios' "What the backend actually does" prose now states that Scenario
+Service restores the scenario's SKU to its seeded stock before the run, rather than describing the
+burst/contention behavior alone. Scenario 8's description also drops the now-false claim that "100 in
+stock" was "chosen so the burst needs no artificial restocking" — it was, until repeated runs proved
+otherwise.
+
+**Why.** Both fixes (already implemented and merged) added a restore-to-seed step because a prior
+run's reservation is never released, so repeated runs without it progressively deplete real stock and
+fail for the wrong reason. The doc text was never updated to match, and Scenario 8's old wording
+actively contradicted the fix that shipped for it.
+
+**Who is affected.** No behavior changed — the restore step already exists in both scenarios' code.
+This is a documentation-only correction so `docs/scenarios.md` matches what the scenarios have
+actually done since PR #47 and PR #63 landed.
+
+---
+
 ## 2026-08-26 — `event-catalog.md`: new `scenario.dlq` topic
 
 **Changed by:** Sprint 7, issue #41 (retry-classification bug in `ConsumerErrorHandlerFactory`).

@@ -190,10 +190,13 @@ only the DLQ shows the outcome.
 
 **Behavior.** Create several simultaneous orders for stock that cannot satisfy all requests.
 
-**What the backend actually does.** Two concurrent `POST /api/orders` calls, each for 2 × SKU-004,
-against SKU-004's seeded stock of 2. Both orders are accepted over HTTP; their `OrderCreated` events
-are processed against `inventory_items` under optimistic locking (`version`), so exactly one
-reservation succeeds. The winner reaches `FULFILLED`; the loser reaches `REJECTED_OUT_OF_STOCK`.
+**What the backend actually does.** Scenario Service first restores SKU-004 to its seeded stock of 2
+(the winning reservation from a prior run is never released, so a repeated run without this would
+find zero stock left and fail both orders for the wrong reason — out-of-stock rather than the
+contention this scenario exists to demonstrate). Two concurrent `POST /api/orders` calls, each for
+2 × SKU-004, follow. Both orders are accepted over HTTP; their `OrderCreated` events are processed
+against `inventory_items` under optimistic locking (`version`), so exactly one reservation succeeds.
+The winner reaches `FULFILLED`; the loser reaches `REJECTED_OUT_OF_STOCK`.
 
 **Demonstrates.** Concurrent access, transaction isolation, locking/versioning, consistency under
 contention.
@@ -221,10 +224,12 @@ contention.
 
 **Behavior.** Generate many orders quickly.
 
-**What the backend actually does.** Scenario Service issues a burst of `POST /api/orders` calls for
-1 × SKU-003 (100 in stock, chosen so the burst needs no artificial restocking) and records
-throughput, processing latency, and consumer lag as the backlog drains across consumer-group
-replicas.
+**What the backend actually does.** Scenario Service first restores SKU-003 to its seeded stock of
+100 — a fulfilled order's reservation is never released, so repeated runs without this step
+progressively deplete real stock and start failing (found live in production; see
+`docs/agent-reports/sprint-8/high-volume-scenario-stock-depletion-and-sse-refetch-storm.md`). It then
+issues a burst of `POST /api/orders` calls for 1 × SKU-003 each and records throughput, processing
+latency, and consumer lag as the backlog drains across consumer-group replicas.
 
 **Demonstrates.** Event throughput, consumer groups, horizontal scaling, lag/processing behavior,
 Kubernetes scaling if an HPA is configured.
