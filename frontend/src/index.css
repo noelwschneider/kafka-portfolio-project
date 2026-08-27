@@ -4,15 +4,24 @@
   --bg: #ffffff;
   --bg-alt: #f7f7f9;
   --border: #e2e2e6;
-  --accent: #5b3df0;
-  --success: #1f8a4c;
-  --success-bg: #e8f7ee;
-  --failure: #c02f3c;
-  --failure-bg: #fbe9ea;
-  --pending: #a06a00;
-  --pending-bg: #fdf3dd;
-  --expected: #2f74b8;
-  --expected-bg: #e6f0fa;
+  --accent: #47b36b;
+  --success: #66a300;
+  --success-bg: color-mix(in srgb, var(--success) 20%, var(--bg));
+  --failure: #ff6680;
+  --failure-bg: color-mix(in srgb, var(--failure) 20%, var(--bg));
+  --pending: #ffcc80;
+  --pending-bg: color-mix(in srgb, var(--pending) 20%, var(--bg));
+  --expected: #bfffff;
+  --expected-bg: color-mix(in srgb, var(--expected) 20%, var(--bg));
+
+  /* Service identity, for #57's scenario-run flow visualization. Chosen to stay clearly outside
+     the hues already claimed above (green x2, coral-red, peach, pale cyan): blue, violet, taupe,
+     teal — distinct enough for the pairs that actually sit adjacent in a typical scenario flow
+     (order->payment, payment->inventory, inventory->fulfillment). */
+  --color-service-order: #3454a8;
+  --color-service-payment: #8b5fbf;
+  --color-service-inventory: #8a7355;
+  --color-service-fulfillment: #2389a8;
 
   font: 15px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
   color-scheme: light dark;
@@ -27,11 +36,6 @@
     --bg: #17171b;
     --bg-alt: #1f1f24;
     --border: #303038;
-    --success-bg: #103a22;
-    --failure-bg: #3a1418;
-    --pending-bg: #3a2c05;
-    --expected: #6fb3f0;
-    --expected-bg: #122c42;
   }
 }
 
@@ -41,6 +45,11 @@
 
 body {
   margin: 0;
+}
+
+a,
+a:visited {
+  color: var(--accent);
 }
 
 .app {
@@ -68,7 +77,7 @@ body {
 }
 
 .app-nav-link:hover {
-  background: var(--bg-alt);
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg));
 }
 
 .app-nav-link.active {
@@ -360,7 +369,7 @@ td {
 }
 
 .scenario-card:hover {
-  box-shadow: 0 4px 12px rgba(91, 61, 240, 0.16);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 16%, transparent);
   transform: translateY(-1px);
 }
 
@@ -395,8 +404,8 @@ td {
 }
 
 .button-primary:hover:not(:disabled) {
-  background: #4c31d6;
-  border-color: #4c31d6;
+  background: color-mix(in srgb, var(--accent) 80%, black);
+  border-color: color-mix(in srgb, var(--accent) 80%, black);
 }
 
 .button-primary:disabled {
@@ -723,6 +732,54 @@ td {
 .order-total-amount {
   margin-left: auto;
   font-variant-numeric: tabular-nums;
+}
+
+.orders-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.orders-filters,
+.order-id-lookup {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.orders-filters label,
+.order-id-lookup label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.orders-filters select,
+.orders-filters input,
+.order-id-lookup input {
+  font: inherit;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  color: var(--text-h);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.pagination-status {
+  opacity: 0.75;
+  font-size: 13px;
 }
 
 .empty-state {
