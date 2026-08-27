@@ -36,6 +36,15 @@ interface OrderStatusChangedMessage {
 
 type StreamState = 'connecting' | 'live' | 'unavailable';
 
+// Same compact "Aug 26, 2:14 PM" treatment issue #20 applied to the Orders table's Created column
+// (frontend/src/pages/OrdersListPage.tsx) — no year, no seconds.
+const timestampFormatter = new Intl.DateTimeFormat(undefined, {
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+});
+
 // Order-scoped replacement for the retired standalone Event Explorer page (issue #7). Same
 // GET /demo/events projection and the same EventRecord shape — `orderId` is now fixed to this
 // page's order instead of being one filter among several, so the remaining filters (type,
@@ -250,9 +259,9 @@ export function OrderDetailPage({ orderId, onBack }: Props) {
               <dt>Total</dt>
               <dd>${data.totalAmount.toFixed(2)}</dd>
               <dt>Created</dt>
-              <dd>{new Date(data.createdAt).toLocaleString()}</dd>
+              <dd>{timestampFormatter.format(new Date(data.createdAt))}</dd>
               <dt>Updated</dt>
-              <dd>{new Date(data.updatedAt).toLocaleString()}</dd>
+              <dd>{timestampFormatter.format(new Date(data.updatedAt))}</dd>
             </dl>
           </div>
 
@@ -288,7 +297,7 @@ export function OrderDetailPage({ orderId, onBack }: Props) {
             {data.statusHistory.map((entry, index) => (
               <li key={index}>
                 <StatusBadge status={entry.status} />
-                <span>{new Date(entry.occurredAt).toLocaleString()}</span>
+                <span>{timestampFormatter.format(new Date(entry.occurredAt))}</span>
               </li>
             ))}
           </ol>

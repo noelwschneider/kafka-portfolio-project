@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
@@ -12,11 +12,12 @@ import {
 import { getOrder } from '../api/orders';
 import { subscribeToStream } from '../api/client';
 import { narrateTimelineEntry } from '../lib/scenarioNarrative';
+import { attributeService, flowRoutingLabel, SERVICE_KEYS, SERVICE_LABELS, type ServiceKey } from '../lib/scenarioFlow';
+import { ServiceIcon } from '../components/ServiceIcon';
 import { LoadingHint } from '../components/LoadingHint';
 
 interface Props {
   runId: string;
-  onBack: () => void;
 }
 
 const TERMINAL_RUN_STATUSES = new Set(['COMPLETED', 'FAILED']);
@@ -48,10 +49,12 @@ function TimelineEntryDetail({
   entry,
   revealed,
   demonstrates,
+  service,
 }: {
   entry: ScenarioTimelineEntry;
   revealed: boolean;
   demonstrates: string[];
+  service: ServiceKey | null;
 }) {
   const detail = entry.detail;
   const hasDetail = detail && Object.keys(detail).length > 0;
@@ -61,44 +64,92 @@ function TimelineEntryDetail({
   const extraKeys = detail ? Object.keys(detail).filter((k) => !knownKeys.has(k)) : [];
 
   return (
-    <li className={`timeline-entry timeline-${entry.kind.toLowerCase()} timeline-reveal${revealed ? ' timeline-revealed' : ''}`}>
-      <div className="timeline-row">
-        <span className="timeline-time">{new Date(entry.occurredAt).toLocaleTimeString(undefined, { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}.{new Date(entry.occurredAt).getMilliseconds().toString().padStart(3, '0')}</span>
-        <div className="timeline-main">
-          <span className="timeline-title">{title}</span>
-          <span className="timeline-headline">{headline}</span>
-          <span className="timeline-raw">
-            <span className="timeline-kind">{entry.kind}</span>
-            <span className="timeline-label">{entry.label}</span>
-          </span>
-          {demonstrates.length > 0 && (
-            <ul className="timeline-demonstrates">
-              {demonstrates.map((point) => (
-                <li key={point}>{point}</li>
-              ))}
-            </ul>
-          )}
+    <li className={`timeline-entry-row timeline-reveal${revealed ? ' timeline-revealed' : ''}`}>
+      <span className="timeline-rail">
+        <span
+          className={`timeline-service-badge${service ? ` service-${service}` : ' service-none'}`}
+          title={service ? SERVICE_LABELS[service] : 'No single-service attribution'}
+        >
+          {service && <ServiceIcon service={service} />}
+        </span>
+      </span>
+      <div className={`timeline-card timeline-${entry.kind.toLowerCase()}`}>
+        <div className="timeline-row">
+          <span className="timeline-time">{new Date(entry.occurredAt).toLocaleTimeString(undefined, { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}.{new Date(entry.occurredAt).getMilliseconds().toString().padStart(3, '0')}</span>
+          <div className="timeline-main">
+            <span className="timeline-title">{title}</span>
+            <span className="timeline-headline">{headline}</span>
+            <span className="timeline-raw">
+              <span className="timeline-kind">{entry.kind}</span>
+              <span className="timeline-label">{entry.label}</span>
+            </span>
+            {demonstrates.length > 0 && (
+              <ul className="timeline-demonstrates">
+                {demonstrates.map((point) => (
+                  <li key={point}>{point}</li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
-      </div>
-      {hasDetail && (
-        <dl className="timeline-detail">
-          {KNOWN_DETAIL_FIELDS.filter((f) => detail && detail[f.key] !== undefined && detail[f.key] !== null).map(
-            (f) => (
-              <div key={f.key} className="timeline-detail-row">
-                <dt>{f.label}</dt>
-                <dd>{String((detail as Record<string, unknown>)[f.key])}</dd>
+        {hasDetail && (
+          <dl className="timeline-detail">
+            {KNOWN_DETAIL_FIELDS.filter((f) => detail && detail[f.key] !== undefined && detail[f.key] !== null).map(
+              (f) => (
+                <div key={f.key} className="timeline-detail-row">
+                  <dt>{f.label}</dt>
+                  <dd>{String((detail as Record<string, unknown>)[f.key])}</dd>
+                </div>
+              ),
+            )}
+            {extraKeys.map((k) => (
+              <div key={k} className="timeline-detail-row">
+                <dt>{k}</dt>
+                <dd>{String((detail as Record<string, unknown>)[k])}</dd>
               </div>
-            ),
-          )}
-          {extraKeys.map((k) => (
-            <div key={k} className="timeline-detail-row">
-              <dt>{k}</dt>
-              <dd>{String((detail as Record<string, unknown>)[k])}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
+            ))}
+          </dl>
+        )}
+      </div>
     </li>
+  );
+}
+
+// The graphical flow layer, issue #57: the topic/endpoint a hop routed through, rendered as its own
+// <li> between two timeline rows whenever the service attribution actually changes — skipping over
+// STATE_CHANGE (and any other unattributed) entries in between rather than treating them as a break
+// in the chain, since they don't represent a different service having done anything. The label comes
+// from the arriving entry's own topic/endpoint (flowRoutingLabel), since that's literally what
+// "routed through" this hop — not fabricated, just the same field already shown in the detail rows
+// below.
+//
+// No icon and no arrow of its own — the departing service's icon is already visible immediately
+// above and the arriving service's icon immediately below, and which way the flow reads is already
+// unambiguous from the timestamps on each entry, so a direction marker here would be redundant. The
+// connecting line itself (drawn on .timeline-connector directly, not a nested .timeline-rail — see
+// index.css) still runs straight through this row, same as every other.
+function TimelineFlowConnector({ label }: { label: string | null }) {
+  return (
+    <li className="timeline-connector" aria-hidden="true">
+      {label && <span className="timeline-connector-label">{label}</span>}
+    </li>
+  );
+}
+
+// A permanent icon->service key, not just a hover title, so the four symbols don't have to be
+// memorized (or hovered one at a time) to read the timeline below. Shown once, above the list.
+function ServiceIconLegend() {
+  return (
+    <div className="timeline-legend">
+      {SERVICE_KEYS.map((service) => (
+        <span key={service} className="timeline-legend-item">
+          <span className={`timeline-service-badge service-${service}`}>
+            <ServiceIcon service={service} />
+          </span>
+          {SERVICE_LABELS[service]}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -168,7 +219,7 @@ function matchDemonstratesPoint(point: string, timeline: ScenarioTimelineEntry[]
 const REVEAL_STEP_MS = 180;
 const REVEAL_STAGGER_CAP = 12;
 
-export function ScenarioRunDetailPage({ runId, onBack }: Props) {
+export function ScenarioRunDetailPage({ runId }: Props) {
   const queryClient = useQueryClient();
   const [streamState, setStreamState] = useState<'connecting' | 'live' | 'unavailable'>('connecting');
 
@@ -347,7 +398,6 @@ export function ScenarioRunDetailPage({ runId, onBack }: Props) {
     <section>
       <div className="page-header">
         <h1>Scenario run {displayRunId}</h1>
-        <button onClick={onBack}>Back to scenarios</button>
       </div>
 
       <div className={`stream-indicator stream-${streamState}`}>
@@ -432,17 +482,36 @@ export function ScenarioRunDetailPage({ runId, onBack }: Props) {
           </div>
 
           <h3>Timeline</h3>
+          {data.timeline.length > 0 && <ServiceIconLegend />}
           {data.timeline.length === 0 && <p>No timeline entries yet.</p>}
           {data.timeline.length > 0 && (
             <ol className="timeline">
-              {data.timeline.map((entry, index) => (
-                <TimelineEntryDetail
-                  key={entry.sequence}
-                  entry={entry}
-                  revealed={index < revealedCount}
-                  demonstrates={demonstratesByEntrySequence.get(entry.sequence) ?? []}
-                />
-              ))}
+              {(() => {
+                const rows: ReactElement[] = [];
+                let lastService: ServiceKey | null = null;
+                data.timeline.forEach((entry, index) => {
+                  const service = attributeService(entry);
+                  if (service && lastService && service !== lastService && index < revealedCount) {
+                    rows.push(
+                      <TimelineFlowConnector
+                        key={`connector-${entry.sequence}`}
+                        label={flowRoutingLabel(entry)}
+                      />,
+                    );
+                  }
+                  if (service) lastService = service;
+                  rows.push(
+                    <TimelineEntryDetail
+                      key={entry.sequence}
+                      entry={entry}
+                      revealed={index < revealedCount}
+                      demonstrates={demonstratesByEntrySequence.get(entry.sequence) ?? []}
+                      service={service}
+                    />,
+                  );
+                });
+                return rows;
+              })()}
             </ol>
           )}
         </>

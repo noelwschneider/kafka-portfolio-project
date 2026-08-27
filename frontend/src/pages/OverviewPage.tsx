@@ -118,6 +118,9 @@ export function OverviewPage() {
   const healthByName = new Map((healths ?? []).map((h) => [h.name, h]));
   const kafka = deriveInfraStatus(healths ?? [], 'kafka');
   const db = deriveInfraStatus(healths ?? [], 'db');
+  // Issue #58: only show the "no data" explainer when a component is actually in that state,
+  // rather than unconditionally — the hint would otherwise appear even when every row is UP.
+  const hasNoDataComponent = kafka.state === 'no data' || db.state === 'no data';
 
   return (
     <section>
@@ -179,10 +182,16 @@ export function OverviewPage() {
           </tr>
         </tbody>
       </table>
-      <p className="hint">"No data" means none has reported yet, not that it's down.</p>
+      {hasNoDataComponent && (
+        <p className="hint">"No data" means none has reported yet, not that it's down.</p>
+      )}
 
       <h2>Scenarios</h2>
-      <p className="hint">See how the system handles a variety of scenarios.</p>
+      <p className="hint">
+        Fake store, real services: the catalog and orders are staged, but every scenario run below
+        triggers real HTTP requests, real Kafka events, and real processing and persistence — not a
+        frontend animation.
+      </p>
 
       {scenariosLoading && <LoadingHint label="Loading scenarios…" />}
       {scenariosError && (

@@ -48,6 +48,9 @@ public class HighVolumeScenario extends AbstractScenarioRunner {
 
     private static final String INVENTORY_CONSUMER_GROUP = "inventory-service";
 
+    /** Names every order this scenario's burst creates so they read unmistakably on the Orders page. */
+    private static final String CUSTOMER_NAME = "Hank Highvolume";
+
     private final ScenarioProperties properties;
     private final ConsumerLagService consumerLagService;
     private final InventoryServiceClient inventoryServiceClient;
@@ -167,7 +170,7 @@ public class HighVolumeScenario extends AbstractScenarioRunner {
             for (int i = 0; i < burstSize; i++) {
                 submissions.add(CompletableFuture.runAsync(() -> runOnThisCorrelation(ctx, () -> {
                     OrderServiceClient.OrderCreationResult result =
-                            createOrder(ctx.runId(), "SKU-003", 1, "demo-customer");
+                            createOrder(ctx.runId(), "SKU-003", 1, CUSTOMER_NAME);
                     if (result.orderId() != null) {
                         orderIds.add(result.orderId());
                     }
