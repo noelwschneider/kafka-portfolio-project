@@ -4,15 +4,15 @@
   --bg: #ffffff;
   --bg-alt: #f7f7f9;
   --border: #e2e2e6;
-  --accent: #5b3df0;
-  --success: #1f8a4c;
-  --success-bg: #e8f7ee;
-  --failure: #c02f3c;
-  --failure-bg: #fbe9ea;
-  --pending: #a06a00;
-  --pending-bg: #fdf3dd;
-  --expected: #2f74b8;
-  --expected-bg: #e6f0fa;
+  --accent: #47b36b;
+  --success: #66a300;
+  --success-bg: color-mix(in srgb, var(--success) 20%, var(--bg));
+  --failure: #ff6680;
+  --failure-bg: color-mix(in srgb, var(--failure) 20%, var(--bg));
+  --pending: #ffcc80;
+  --pending-bg: color-mix(in srgb, var(--pending) 20%, var(--bg));
+  --expected: #bfffff;
+  --expected-bg: color-mix(in srgb, var(--expected) 20%, var(--bg));
 
   font: 15px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
   color-scheme: light dark;
@@ -27,11 +27,6 @@
     --bg: #17171b;
     --bg-alt: #1f1f24;
     --border: #303038;
-    --success-bg: #103a22;
-    --failure-bg: #3a1418;
-    --pending-bg: #3a2c05;
-    --expected: #6fb3f0;
-    --expected-bg: #122c42;
   }
 }
 
@@ -41,6 +36,11 @@
 
 body {
   margin: 0;
+}
+
+a,
+a:visited {
+  color: var(--accent);
 }
 
 .app {
@@ -68,7 +68,7 @@ body {
 }
 
 .app-nav-link:hover {
-  background: var(--bg-alt);
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg));
 }
 
 .app-nav-link.active {
@@ -360,7 +360,7 @@ td {
 }
 
 .scenario-card:hover {
-  box-shadow: 0 4px 12px rgba(91, 61, 240, 0.16);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 16%, transparent);
   transform: translateY(-1px);
 }
 
@@ -395,8 +395,8 @@ td {
 }
 
 .button-primary:hover:not(:disabled) {
-  background: #4c31d6;
-  border-color: #4c31d6;
+  background: color-mix(in srgb, var(--accent) 80%, black);
+  border-color: color-mix(in srgb, var(--accent) 80%, black);
 }
 
 .button-primary:disabled {
