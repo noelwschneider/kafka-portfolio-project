@@ -116,3 +116,31 @@ No dependency on any other sprint's work. Within the sprint, see the sequencing 
 
 No new backend/frontend/high-level design docs. #54 produces the styling contract itself as its
 deliverable (location and exact doc format are that task's own decision, not pre-specified here).
+
+## Closing state
+
+Eight of nine planned goals shipped: #52, #54, #56, #57, #33, #21, #50, #51, #58. **#55** (refactor
+existing components onto the styling contract) did not ship — a direct check against
+`frontend/src/index.css` found the flat `--success`/`--failure`/`--pending`/`--expected` tokens the
+contract calls for renaming into the `--color-status-*` namespace are still under their old names.
+Moved back to Backlog with its Sprint cleared, alongside its parent initiative **#53**, rather than
+marked delivered.
+
+Two unplanned items came out of a full local review of the sprint's combined changes and shipped the
+same day: **#71** (Home nav-tab rename, a real CSS-specificity bug making visited nav tabs render
+accent-green instead of neutral, a scenario-card redesign, and removing a redundant back-button) and
+**#72** (streamlining the Architecture page to a diagram, a technology table, and repository links,
+dropping duplicated content and verbose rationale prose).
+
+**#46**'s fix (issue tracked outside this sprint, fixed via PR #47 before Sprint 8 opened) remains
+undeployed — the plan is to deploy it together with this sprint's own changes, so it stays open and
+out of Sprint 8's Done count.
+
+One real process incident: merging #65 initially landed on a stale intermediate branch instead of
+`main` (its base had never been retargeted after an earlier branch-closure/replacement), and deleting
+that branch during cleanup orphaned the merge commit — the feature briefly existed only in already-
+pushed remote refs and local git objects, not on any branch. Caught by directly checking for the
+feature's files on `origin/main` rather than trusting `gh pr merge`'s reported success, and recovered
+by pushing the still-reachable commit to a fresh branch and re-merging it against the correct base.
+Every other merge this sprint was independently re-verified by the same direct content check after
+the fact, confirming no other instance of the same gap.
