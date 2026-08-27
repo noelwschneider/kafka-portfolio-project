@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { listOrders, type OrderSummary } from '../api/orders';
+import { listOrders, type OrderStatus, type OrderSummary } from '../api/orders';
 import { StatusBadge } from '../components/StatusBadge';
 import { LoadingHint } from '../components/LoadingHint';
 import { CreateOrderPage } from './CreateOrderPage';
@@ -36,6 +36,19 @@ const createdAtFormatter = new Intl.DateTimeFormat(undefined, {
 
 const PAGE_SIZE = 20;
 
+// docs/order-state-machine.md's full status enum, in lifecycle order — used for the status filter.
+const ORDER_STATUSES: OrderStatus[] = [
+  'PENDING',
+  'INVENTORY_RESERVED',
+  'REJECTED_OUT_OF_STOCK',
+  'PAYMENT_PENDING',
+  'PAID',
+  'PAYMENT_FAILED',
+  'FULFILLMENT_PENDING',
+  'FULFILLED',
+  'FAILED',
+];
+
 function sortOrders(orders: OrderSummary[], key: SortKey, dir: SortDir): OrderSummary[] {
   const sorted = [...orders].sort((a, b) => {
     const av = a[key];
@@ -48,12 +61,37 @@ function sortOrders(orders: OrderSummary[], key: SortKey, dir: SortDir): OrderSu
 
 export function OrdersListPage({ onSelectOrder, onOrderCreated, initialCreateOpen = false, onCreateClosed }: Props) {
   const [page, setPage] = useState(0);
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | ''>('');
+  const [customerIdFilter, setCustomerIdFilter] = useState('');
+  const [orderIdLookup, setOrderIdLookup] = useState('');
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['orders', page],
-    queryFn: () => listOrders({ page, size: PAGE_SIZE }),
+    queryKey: ['orders', page, statusFilter, customerIdFilter],
+    queryFn: () =>
+      listOrders({
+        page,
+        size: PAGE_SIZE,
+        status: statusFilter || undefined,
+        customerId: customerIdFilter || undefined,
+      }),
     refetchInterval: 4000,
   });
+
+  function updateStatusFilter(value: OrderStatus | '') {
+    setStatusFilter(value);
+    setPage(0);
+  }
+
+  function updateCustomerIdFilter(value: string) {
+    setCustomerIdFilter(value);
+    setPage(0);
+  }
+
+  function handleOrderIdLookup(e: FormEvent) {
+    e.preventDefault();
+    const id = orderIdLookup.trim();
+    if (id) onSelectOrder(id);
+  }
 
   const [sortKey, setSortKey] = useState<SortKey>('createdAt');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -100,10 +138,57 @@ export function OrdersListPage({ onSelectOrder, onOrderCreated, initialCreateOpe
         <button onClick={() => setCreateOpen(true)}>New order</button>
       </div>
 
+      <div className="orders-toolbar">
+        <div className="orders-filters">
+          <label>
+            Status
+            <select
+              value={statusFilter}
+              onChange={(e) => updateStatusFilter(e.target.value as OrderStatus | '')}
+            >
+              <option value="">All</option>
+              {ORDER_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {status.replaceAll('_', ' ')}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Customer ID
+            <input
+              value={customerIdFilter}
+              onChange={(e) => updateCustomerIdFilter(e.target.value)}
+              placeholder="demo-customer"
+            />
+          </label>
+        </div>
+
+        <form className="order-id-lookup" onSubmit={handleOrderIdLookup}>
+          <label>
+            Go to order
+            <input
+              value={orderIdLookup}
+              onChange={(e) => setOrderIdLookup(e.target.value)}
+              placeholder="order-21873"
+            />
+          </label>
+          <button type="submit" disabled={!orderIdLookup.trim()}>
+            Go
+          </button>
+        </form>
+      </div>
+
       {isLoading && <LoadingHint label="Loading orders…" />}
       {isError && <p className="error">{(error as Error).message}</p>}
 
-      {data && data.content.length === 0 && (
+      {data && data.content.length === 0 && (statusFilter || customerIdFilter) && (
+        <div className="empty-state">
+          <p>No orders match these filters.</p>
+        </div>
+      )}
+
+      {data && data.content.length === 0 && !statusFilter && !customerIdFilter && (
         <div className="empty-state">
           <p>No orders yet.</p>
           <button onClick={() => setCreateOpen(true)}>Place the first order</button>
