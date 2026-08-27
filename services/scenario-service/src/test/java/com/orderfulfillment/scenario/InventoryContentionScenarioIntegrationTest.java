@@ -27,6 +27,12 @@ class InventoryContentionScenarioIntegrationTest extends AbstractIntegrationTest
     @Test
     void twoConcurrentOrdersAreEachTrackedToTheirOwnOutcome() {
         PAYMENT_SERVICE.stubFor(put(urlPathEqualTo("/demo/payment-behavior")).willReturn(aResponse().withStatus(200)));
+        // The scenario restores SKU-004 to seed stock before firing the two contending orders
+        // (InventoryContentionScenario's restoreContentionSkuToSeed) — without it, repeated runs
+        // against a real Inventory Service run the SKU down to 0 and both orders fail out-of-stock
+        // instead of exercising the intended winner/loser contention.
+        INVENTORY_SERVICE.stubFor(post(urlPathEqualTo("/demo/inventory/SKU-004/restore"))
+                .willReturn(aResponse().withStatus(200)));
 
         String winnerOrderId = "order-contention-winner";
         String loserOrderId = "order-contention-loser";
