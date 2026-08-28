@@ -1,3 +1,15 @@
+# Pinned so the Compose project name never depends on the invoking directory's basename. Without
+# this, `docker compose` derives the project name from the current directory (e.g. a git worktree
+# checked out under a different basename gets a different default project name than the main
+# checkout), and a build in one directory can silently diverge from an `up` run in another —
+# `docker compose -p kafka-portfolio-project up` without `--build` reuses whatever
+# `kafka-portfolio-project-*` images already exist rather than the ones just built under the
+# worktree's own default name. Pinning the name here makes `build` and `up` resolve to the same
+# project, and therefore the same image tags, from any checkout of this repo with no `-p` flag
+# needed at all. See docs/agent-reports/sprint-9/harden-concurrent-agent-docker-git-hazards.md for
+# the incident this closes.
+name: kafka-portfolio-project
+
 services:
   postgres:
     image: postgres:16-alpine
