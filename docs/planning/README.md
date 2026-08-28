@@ -16,6 +16,7 @@ relevant) its own design/roadmap docs the way `sprint-1/` did for the original M
 | 2 | [`portfolio-plan.md`](portfolio-plan.md) | Why this project exists (portfolio goals), recruiter/engineer presentation, interview knowledge checklist, "portfolio complete" checklist, resume bullets | Before writing any user-facing copy or judging "is this done" |
 | 3 | [`engineering-rules.md`](engineering-rules.md) | Engineering constraints: core directive, the 20 agent rules, contract coordination | Read by every agent before starting any task |
 | 4 | This file | Index and current-sprint pointer | Always first |
+| 5 | [`handoff.md`](handoff.md) | Current deploy state, current sprint status, notable recent incidents, backlog highlights, reading order | Resuming the project after time away |
 
 ## Sprints
 
@@ -112,6 +113,17 @@ review (nav/scenario-card polish, an Architecture page streamline) — see
 | File | What's in it |
 |---|---|
 | [`sprint-8/sprint-8-plan.md`](sprint-8/sprint-8-plan.md) | This sprint's goals, sequencing, developer-involvement checkpoints, and dependencies |
+
+### `sprint-9/` — workflow portability and resumability (current)
+
+Theme: making the project's own agentic workflow — presets, skills, hooks, standing rules — usable
+outside this repo, plus a handoff doc so returning to the project after a gap doesn't mean
+reconstructing state from several scattered docs and the live board. See
+[`sprint-9/sprint-9-plan.md`](sprint-9/sprint-9-plan.md) for the full plan.
+
+| File | What's in it |
+|---|---|
+| [`sprint-9/sprint-9-plan.md`](sprint-9/sprint-9-plan.md) | This sprint's goals, sequencing, developer-involvement checkpoints, and dependencies |
 
 ## Cross-reference note
 

@@ -72,7 +72,17 @@ own account.
 ADRs for architectural decisions made during the sprint. Update any doc the sprint made stale —
 especially README claims about how the project is run, and any pointer to a file that moved.
 
-## 4. Hand off to review
+## 4. Update the handoff doc
+
+Refresh `docs/planning/handoff.md` so it reflects the state this closing pass just established: the
+sprint's actual outcome for the "Current sprint and its status" section (or the next sprint's opening
+theme, if one is already planned), any deploy that happened during the sprint, and any incident from
+this sprint worth adding to "Notable recent incidents" — same bar as that section already uses (an
+incident is notable if it changed a rule or process, not because it happened). Update backlog
+highlights only if something newly time-sensitive or blocking landed on the board; don't pad it with
+routine carryover.
+
+## 5. Hand off to review
 
 Closing establishes what happened. Deciding what changes because of it is `/sprint-review` — run it
 next, as a separate pass.
