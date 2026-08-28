@@ -187,11 +187,6 @@ export function OverviewPage() {
       )}
 
       <h2>Scenarios</h2>
-      <p className="hint">
-        Fake store, real services: the catalog and orders are staged, but every scenario run below
-        triggers real HTTP requests, real Kafka events, and real processing and persistence — not a
-        frontend animation.
-      </p>
 
       {scenariosLoading && <LoadingHint label="Loading scenarios…" />}
       {scenariosError && (
