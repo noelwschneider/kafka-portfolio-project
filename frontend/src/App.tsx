@@ -97,9 +97,10 @@ function OrderDetailRoute() {
 }
 
 function ScenarioRunDetailRoute() {
+  const navigate = useNavigate();
   const runId = useParamOrRedirect('runId', '/scenarios');
   if (!runId) return null;
-  return <ScenarioRunDetailPage runId={runId} />;
+  return <ScenarioRunDetailPage runId={runId} onBack={() => navigate('/scenarios')} />;
 }
 
 // Small helper: react-router's useParams is typed as possibly-undefined; every detail route in
