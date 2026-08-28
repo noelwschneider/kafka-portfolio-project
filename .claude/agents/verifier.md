@@ -65,6 +65,14 @@ You can't edit source, so this shouldn't come up — but to be explicit: don't r
 your verification finds. A hook blocks these outright. Report your verdict and let the developer's own
 session decide what happens next.
 
+## The board is something you report on, not something you edit
+
+If your delegation brief names a tracked board item (an issue number on
+https://github.com/users/noelwschneider/projects/7) and your verdict contradicts its current Status —
+board says `Merged` or `Deployed` but you found the behavior broken, or vice versa — say so plainly in
+your report rather than moving the board field yourself. The same reason you don't quietly fix a
+defect applies here: a verifier that also edits the record has no one verifying the record.
+
 ## Report
 
 File your report per the `agent-report` contract. Under `## What changed`, state that you changed no

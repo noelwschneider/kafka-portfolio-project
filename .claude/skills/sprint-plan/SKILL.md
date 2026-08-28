@@ -85,8 +85,7 @@ Read the previous sprint's plan under `docs/planning/sprint-N/` for what was def
    context-switching. This is a strong preference, not a hard rule — state when you are breaking it
    and why the benefit is worth it.
 
-Tier 1 outranks Tier 2 at equal benefit. `Shelved` items stay shelved unless something has changed
-that you can name.
+`Shelved` items stay shelved unless something has changed that you can name.
 
 ## Write and update as each decision is reached
 
@@ -97,8 +96,8 @@ Don't hold a mental slate and dump it at the end. As soon as something is actual
   plan. Create the file as soon as there's real content for it (even just a theme and one goal), and
   keep it accurate as more gets decided. State current content only; this is a plan doc, not a log.
 - **Update the board to match**, using the `board` skill for the mechanics: convert a draft to a real
-  Issue once it's genuinely scheduled into this sprint, set `Status: Planned` and `Priority`, set
-  `Sprint` (add the option first if this sprint doesn't have one yet — see the `board` skill). When an
+  Issue once it's genuinely scheduled into this sprint, set `Status: Planned` and `Sprint` (add the
+  option first if this sprint doesn't have one yet — see the `board` skill). When an
   Initiative turns out to have several genuinely separable deliverables, decompose it into native
   GitHub sub-issues now, per `engineering-rules.md`'s Initiative/Task policy — that's a planning-time
   judgment call, not something to defer. Run the `board` skill's duplicate-check and worthiness-check

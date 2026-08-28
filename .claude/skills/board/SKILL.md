@@ -1,6 +1,6 @@
 ---
 name: board
-description: Add to or update the GitHub Project board - create backlog items, move status, set priority and sprint, convert drafts to real issues, and log unplanned work. Use whenever work is identified, started, or finished.
+description: Add to or update the GitHub Project board - create backlog items, move status through its full lifecycle, set sprint, convert drafts to real issues, and log unplanned work. Use whenever work is identified, started, finished, merged, or deployed.
 argument-hint: what to add or change
 allowed-tools: Bash(gh project *), Bash(gh issue *), Bash(gh api *)
 ---
@@ -13,19 +13,62 @@ project id `PVT_kwHOB38DIc4BhEqT`.
 The board tracks live status. `docs/planning/sprint-N/sprint-N-plan.md` owns goals, dependencies, and
 rationale. Do not duplicate rationale into board items, and do not track live status in the markdown.
 
+There is no Priority field. It existed as Tier 1/Tier 2/Shelved through Sprint 8 and was removed in
+Sprint 8's review pass — it never actually drove a sequencing decision (sprint selection went by the
+criteria in the `sprint-plan` skill, not by scanning tier values), and its one genuinely useful
+distinction, "deprioritized indefinitely" vs. "just not yet scheduled," is now a Status value
+(`Shelved`) instead of a second field.
+
 ## Fields
 
 | Field | Field id | Values (option id) |
 |---|---|---|
-| Status | `PVTSSF_lAHOB38DIc4BhEqTzhgB0vE` | Backlog `f75ad846`, Planned `9935e4cd`, In Progress `47fc9ee4`, Done `98236657` |
-| Priority | `PVTSSF_lAHOB38DIc4BhEqTzhgB9Dw` | Tier 1 `81a17eaa`, Tier 2 `97537018`, Shelved `7c38e779` |
+| Status | `PVTSSF_lAHOB38DIc4BhEqTzhgB0vE` | Backlog `f75ad846`, Shelved `082c8d65`, Planned `9935e4cd`, In Progress `47fc9ee4`, Ready to Merge `bfcc30c4`, Merged `0fdb8e6a`, Deployed `d546d412` |
 | Sprint | `PVTSSF_lAHOB38DIc4BhEqTzhgB9D0` | Sprint 2 `97a0e823`, Sprint 3 `e4a85fe9`, Sprint 4 `ae9c5ee9`, Sprint 5 `04b1e3dd` |
 
-This table can still drift stale if the field is edited by hand (GitHub's UI, or a mutation that
-omits existing ids) — re-read before trusting it whenever a write fails:
+This table can still drift stale if a field is edited by hand (GitHub's UI, or a mutation that omits
+existing ids) — re-read before trusting it whenever a write fails:
 
 ```bash
 gh project field-list 7 --owner noelwschneider --format json
+```
+
+## Status lifecycle
+
+Seven states, in the order work actually moves through them:
+
+`Backlog` → `Planned` → `In Progress` → `Ready to Merge` → `Merged` → `Deployed`
+
+`Shelved` sits outside that line — deprioritized indefinitely, not on a path to anywhere until
+something changes. An item moves *into* Shelved from wherever it currently sits, and back to
+`Backlog` (never straight to `Planned`) if it's revived.
+
+**Who advances which transition** — this is what keeps the board from going stale, not a suggestion:
+
+- **Backlog → Planned → In Progress**: the orchestrating session, during `/sprint-plan` and
+  `/sprint-open` — see those skills.
+- **In Progress → Ready to Merge**: whoever is doing the work. A delegated subagent (`implementer`,
+  `investigator`, `verifier`, `platform`) moves its own tracked item to `Ready to Merge` once it has
+  pushed a branch and opened a PR — see each preset's "Keep the board current" section. This is the
+  transition most likely to get missed, because it happens inside a subagent's own turn, not the
+  orchestrating session's.
+- **Ready to Merge → Merged**: the orchestrating session, immediately after actually running
+  `gh pr merge` — merging is never a subagent's call (`.claude/rules/git.md`), so this transition only
+  ever happens in the developer-facing session.
+- **Merged → Deployed**: the orchestrating session, after a `/deploy` run's Stage 4 verification
+  confirms the merged commit is actually live. Not automatic — this project's deploys are manual and
+  often bundle several sprints' merged-but-undeployed work into one production push (Sprint 8 did
+  exactly this), so "merged" and "deployed" can sit apart for a real stretch of time on purpose.
+
+**Validation.** `check-drift.py` in this skill's directory cross-checks every board item with a linked
+GitHub Issue against that issue's actual open/closed state, and reports anything that contradicts
+(e.g. Status says `Deployed` but the issue is still open — a real signal something was never advanced,
+or never closed). It cannot tell `Merged` apart from `Deployed` — that needs knowing what's actually
+live, which is a deploy-verification fact, not something derivable from issue state alone. Run it by
+hand any time; `/sprint-close`'s board reconciliation step runs it as part of Step 1.
+
+```bash
+.claude/skills/board/check-drift.py
 ```
 
 ## Adding a new Sprint value
@@ -95,14 +138,14 @@ mutation {
 }'
 ```
 
-The project item id stays the same across the conversion — every field already set on it (Priority,
-Status, Sprint) carries over untouched. Only the `content` changes from a `DraftIssue` to a real
-`Issue` with a number and a repo URL. The draft's title and body become the new issue's title and
-body automatically.
+The project item id stays the same across the conversion — every field already set on it (Status,
+Sprint) carries over untouched. Only the `content` changes from a `DraftIssue` to a real `Issue` with
+a number and a repo URL. The draft's title and body become the new issue's title and body
+automatically.
 
 ## Editing a draft item's title or body
 
-`gh project item-edit` only sets fields (Status, Priority, Sprint) — it has no option for a draft's
+`gh project item-edit` only sets fields (Status, Sprint) — it has no option for a draft's
 title or body, and its `--field-id` flag will happily point at the Title field and silently overwrite
 it with whatever `--text` you pass, with no confirmation and no diff. This has actually happened:
 testing an edit against the wrong field replaced a draft's title with placeholder text before the
@@ -209,4 +252,8 @@ sprint-selection time when the real seams are visible, not upfront.
 **Log unplanned work too, retroactively if needed.** A board that reflects only planned work becomes
 inaccurate the first time something urgent jumps the queue.
 
-**A new item needs a title, a Priority, and a Status.** Set Sprint only when it is actually scheduled.
+**A new item needs a title and a Status.** Set Sprint only when it is actually scheduled.
+
+**Advance Status as work actually moves, not in a batch afterward.** A board that only gets updated
+during `/sprint-close` has been silently wrong for the entire sprint in between — see the Status
+lifecycle section above for who owns which transition.

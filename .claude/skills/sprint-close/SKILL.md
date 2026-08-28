@@ -26,19 +26,34 @@ response so a wrong inference is caught immediately rather than after the work i
 
 - **The sprint you were given is the current one** per `docs/planning/README.md`. If not, confirm which
   sprint is meant before touching the board.
-- **Nothing is still `In Progress`.** List anything that is and confirm with the developer before
-  continuing. Closing over in-flight work moves it back to `Backlog` and clears its Sprint, which
-  silently erases that it was ever started.
+- **Nothing is still `In Progress` or `Ready to Merge`.** List anything that is and confirm with the
+  developer before continuing. Closing over in-flight `In Progress` work moves it back to `Backlog`
+  and clears its Sprint, which silently erases that it was ever started. An item stuck at
+  `Ready to Merge` means a PR is open and unreviewed — that is a decision for the developer to make
+  (review and merge, or explicitly defer it), not something to close over either.
 
 ## 1. Reconcile the board against reality
 
-List the sprint's items and check each against what actually landed:
+Run the drift check first — it catches the mechanical class of staleness (a board Status implying an
+open/closed state its linked issue's actual state contradicts) before you spend time reasoning about
+it by hand:
+
+```bash
+.claude/skills/board/check-drift.py
+```
+
+Investigate and resolve everything it reports, then list the sprint's items and check each against
+what actually landed:
 
 ```bash
 gh project item-list 7 --owner noelwschneider --limit 200 --format json
 ```
 
-- Everything finished moves to `Done`.
+- **Everything actually merged to `main` moves to `Merged`.** Only move it to `Deployed` if you have
+  direct evidence it is live — a `/deploy` run's own verification stage, or a fresh check against the
+  running production system. Do not infer `Deployed` from `Merged` plus time passed; this project's
+  deploys are manual and often bundle several sprints' worth of already-merged work into one push, so
+  "merged a while ago" is not evidence of "deployed."
 - Anything not finished goes back to `Backlog` with its `Sprint` cleared, so it does not read as
   delivered.
 - **Unplanned work gets added retroactively.** Urgent work that jumped the queue, incidents, and
