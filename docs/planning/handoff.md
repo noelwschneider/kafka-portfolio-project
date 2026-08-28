@@ -41,16 +41,16 @@ developer-involvement checkpoints.
   instead of `main` because its base had never been retargeted after an earlier branch closure, and
   deleting that branch during cleanup briefly orphaned the merge commit. Caught by directly checking
   for the feature's files on `origin/main` rather than trusting `gh pr merge`'s reported success.
-  This is why `.claude/rules/git.md` now requires confirming a PR's base before merging and verifying
+  This is why `~/.claude/rules/git.md` now requires confirming a PR's base before merging and verifying
   merged content is actually reachable from the target afterward, rather than trusting reported merge
   success.
 - **Sprint 7 CI failure went unnoticed until caught manually,** because a push to `main` had run CI
-  asynchronously with nobody watching. This is why `.claude/rules/git.md` requires branch protection
+  asynchronously with nobody watching. This is why `~/.claude/rules/git.md` requires branch protection
   and an explicit `gh pr checks --watch` step rather than a glance at the PR page.
 - **Sprint 8 issue #46:** a `platform` subagent diagnosed and merged a production fix in one
   delegation before the developer saw the diff. The fix held, but that was luck covering a process
   gap. This is why merges and deploys are now mechanically blocked for subagents
-  (`.claude/hooks/block-subagent-merge-deploy.py`) rather than left to convention.
+  (the `noel-workflow` plugin's `block-subagent-merge-deploy.py` hook) rather than left to convention.
 
 ## Backlog highlights
 

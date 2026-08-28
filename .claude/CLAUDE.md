@@ -44,12 +44,22 @@ The handful most likely to cause real damage if missed in a session that skips r
 delegated, verified, and landed, and why the process is shaped the way it is. Read it before
 spawning or briefing any subagent.
 
-Delegate to one of the four presets in `.claude/agents/` — `implementer`, `investigator`,
-`verifier`, `platform` — chosen by task shape, not by which service the code lives in. Each preset
-carries its own model and effort tier, so tiering no longer depends on a per-sprint document being
-kept current. Escalate an individual hard task by passing `model: opus` at spawn time rather than
-editing the preset. The delegation prompt should carry only what is task-specific: exact file paths
-and line numbers, what has already been ruled out, and explicit scope boundaries.
+**The workflow itself lives in the `noel-workflow` plugin, not in this repo.** The four presets, the
+eight generic skills, and the four hooks are installed from that plugin; this repo keeps only what is
+specific to it — `.claude/skills/deploy/`, `.claude/skills/dev-box/`, and `.claude/workflow.json`,
+which supplies the project's coordinates (report and planning roots, board owner/number, this
+project's extra blocked deploy verbs, and the Flyway contract-escalation rule) to the plugin's logic.
+`.claude/workflow.json` holds **no** GitHub Project field or option ids; those resolve at runtime.
+The standing git and documentation rules live in `~/.claude/rules/`.
+
+Delegate to one of the four presets — chosen by task shape, not by which service the code lives in.
+They are namespaced, so `subagent_type` must be the fully-qualified name: `noel-workflow:implementer`,
+`noel-workflow:investigator`, `noel-workflow:verifier`, `noel-workflow:platform`. A bare name is
+rejected outright. Each preset carries its own model and effort tier, so tiering no longer depends on
+a per-sprint document being kept current. Escalate an individual hard task by passing `model: opus` at
+spawn time rather than editing the preset. The delegation prompt should carry only what is
+task-specific: exact file paths and line numbers, what has already been ruled out, and explicit scope
+boundaries.
 
 Sprint plans under `docs/planning/sprint-N/` own scope and rationale, and record tier deviations
 only. `docs/planning/sprint-1/execution-plan.md` remains the phase-by-phase record of the original
@@ -69,6 +79,18 @@ A third failure mode — the project board reading as more done than reality, be
 its Status past the point where they stopped looking — is handled the same way in spirit but not
 mechanically enforceable the way the two above are: no tool-call event corresponds to "the board is
 now stale." Each preset's "Keep the board current" section makes advancing its own item to
-`Ready to Merge` part of finishing the task, not an afterthought, and `.claude/skills/board/check-drift.py`
-gives a repeatable way to catch the cases that still slip through — see the `board` skill's Status
-lifecycle section for the full contract.
+`Ready to Merge` part of finishing the task, not an afterthought, and the `board` skill's
+`check-drift.py` gives a repeatable way to catch the cases that still slip through — see the `board`
+skill's Status lifecycle section for the full contract.
+
+## Project-specific git facts
+
+The general git rules — no AI attribution, commit shape, branch/PR/CI/merge, confirm the base before
+merging, verify reachability after, subagents never merge or deploy — are in `~/.claude/rules/git.md`
+and apply everywhere. What is specific to this repo:
+
+- `main`'s branch protection requires the `required-checks` job in `.github/workflows/ci.yml` to pass
+  before a PR can merge.
+- The deploy verbs a subagent may not run here are `redeploy.sh` and
+  `gh workflow run build-images.yml`, declared in `.claude/workflow.json` and enforced by the
+  plugin's `block-subagent-merge-deploy.py` hook.

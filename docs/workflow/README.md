@@ -7,16 +7,19 @@ directory is about the process, not the product.
 - [`commands.md`](commands.md) — every command, what it does, and when it's useful.
 - [`agent-workflow.md`](agent-workflow.md) — the design and the reasoning behind it.
 
-The executable pieces live in `.claude/` and are tracked in version control:
+Most of the executable workflow ships in the `noel-workflow` Claude Code plugin rather than in this
+repo, so it can be reused by other projects. What lives where:
 
 | Path | What it is |
 |---|---|
-| `.claude/agents/*.md` | Subagent presets — one per recurring task shape, carrying model, effort, tool limits, and standing instructions |
-| `.claude/skills/agent-report/` | The report contract every delegated agent files, preloaded into all four presets |
-| `.claude/hooks/` | The verification gate: a start mark and a `SubagentStop` check that refuses completion without a real report |
-| `.claude/skills/*/SKILL.md` | Procedures that load only when invoked |
-| `.claude/rules/*.md` | Standing rules for documentation and git, loaded every session |
-| `.claude/settings.json` | Registers the hooks |
+| plugin `agents/*.md` | Subagent presets — one per recurring task shape, carrying model, effort, tool limits, and standing instructions. Addressed as `noel-workflow:<name>` |
+| plugin `skills/agent-report/` | The report contract every delegated agent files, preloaded into all four presets |
+| plugin `hooks/` | The verification gate: a start mark and a `SubagentStop` check that refuses completion without a real report, plus the merge/deploy and AI-attribution blocks |
+| plugin `skills/*/SKILL.md` | Generic procedures that load only when invoked — `board`, `delegate`, `tier`, and the four sprint skills |
+| `.claude/skills/deploy/`, `.claude/skills/dev-box/` | The two procedures that are specific to this project's cluster and Hetzner account, and stay here |
+| `.claude/workflow.json` | This project's coordinates: report and planning roots, board owner/number, extra blocked deploy verbs, and the Flyway contract-escalation rule. No GitHub Project field or option ids — those resolve at runtime |
+| `.claude/CLAUDE.md` | Project facts, loaded every session |
+| `~/.claude/rules/*.md` | Standing rules for documentation and git, loaded into every session on this machine |
 
 ## Skills
 
