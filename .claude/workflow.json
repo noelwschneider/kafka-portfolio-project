@@ -1,0 +1,26 @@
+{
+  "$comment": "Project identity for the noel-workflow plugin. The plugin ships the logic; this file supplies the coordinates. No GitHub Project field or option ids live here - they are resolved at runtime via `gh project field-list`, which is what removes the stale-id failure class rather than relocating it.",
+
+  "reportRoot": "docs/agent-reports",
+  "planningRoot": "docs/planning",
+
+  "board": {
+    "owner": "noelwschneider",
+    "repo": "kafka-portfolio-project",
+    "projectNumber": 7
+  },
+
+  "blockedSubagentCommands": [
+    { "pattern": "redeploy\\.sh\\b", "label": "running redeploy.sh" },
+    { "pattern": "\\bgh\\s+workflow\\s+run\\s+build-images\\.yml\\b", "label": "publishing images (build-images.yml)" }
+  ],
+
+  "contractEscalations": [
+    {
+      "glob": "**/db/migration/*.sql",
+      "docs": ["docs/db-ownership.md", "docs/CHANGELOG-contracts.md"],
+      "heading": "## Frozen contract impact",
+      "message": "You modified a Flyway migration under a db/migration/ directory without touching\ndocs/db-ownership.md or docs/CHANGELOG-contracts.md. If that migration changes the\nshape of a table docs/db-ownership.md documents (a column, a unique/check constraint,\netc.), that is a frozen-contract change - follow the coordination protocol in\n.claude/CLAUDE.md: propose the change in db-ownership.md, then log it in\ndocs/CHANGELOG-contracts.md.\n\nAdd '## Frozen contract impact' to your report either way, stating one of:\n  - which table/constraint changed and that db-ownership.md and\n    CHANGELOG-contracts.md were updated to match, or\n  - why this migration does not touch anything db-ownership.md documents\n    (e.g. a brand-new table, or a change to an undocumented internal detail)."
+    }
+  ]
+}

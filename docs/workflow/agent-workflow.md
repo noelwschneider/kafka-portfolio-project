@@ -2,9 +2,11 @@
 
 How agentic work on this project is planned, delegated, verified, and landed.
 
-This document owns the intent and reasoning. The executable pieces live in `.claude/` — subagent
-presets in `.claude/agents/`, skills in `.claude/skills/`, the verification gate in `.claude/hooks/`
-— and are tracked in version control so they cannot silently lapse.
+This document owns the intent and reasoning. The executable pieces live in the `noel-workflow`
+plugin — subagent presets, skills, and the verification gate — and are tracked in version control
+in that plugin's own source so they cannot silently lapse. This repo keeps only what is specific to
+it: the `deploy` and `dev-box` skills, and `.claude/workflow.json`, which supplies the project's
+coordinates to the plugin's logic.
 
 ## The problem this solves
 
@@ -35,10 +37,11 @@ failures. So the organizing principle here is:
 
 | Layer | Binding? | Holds | Lives in |
 |---|---|---|---|
-| Hooks | Enforced — cannot be skipped or argued with | Gates that must not be optional | `.claude/hooks/` + `.claude/settings.json` |
-| Subagent presets | Applied automatically every run | Standing instructions and tool limits for a task shape | `.claude/agents/*.md` |
-| Skills | Loaded on demand, free until invoked | Procedures and reference knowledge | `.claude/skills/*/SKILL.md` |
-| CLAUDE.md and rules | Always in context, advisory | Project facts and standing rules | `.claude/CLAUDE.md` |
+| Hooks | Enforced — cannot be skipped or argued with | Gates that must not be optional | plugin `hooks/` + `hooks/hooks.json` |
+| Subagent presets | Applied automatically every run | Standing instructions and tool limits for a task shape | plugin `agents/*.md` |
+| Skills | Loaded on demand, free until invoked | Procedures and reference knowledge | plugin `skills/*/SKILL.md`, plus `.claude/skills/*/SKILL.md` for project-specific ones |
+| CLAUDE.md and rules | Always in context, advisory | Project facts and standing rules | `.claude/CLAUDE.md`, `~/.claude/rules/` |
+| Project config | Read by the layers above | This repo's coordinates: roots, board, deploy verbs, contract rules | `.claude/workflow.json` |
 
 Two rules follow from the table:
 
@@ -111,12 +114,15 @@ Delegation goes to one of four presets, chosen by task shape rather than by whic
 lives in. Splitting by service ownership was tried and is not how work actually divides here: across
 31 agent reports it divided by how well-specified a task was and how it had to be verified.
 
-| Preset | Shape | Model / effort |
+The presets are namespaced by the plugin that ships them, so `subagent_type` must be the
+fully-qualified name — a bare `implementer` is rejected.
+
+| Preset (`subagent_type`) | Shape | Model / effort |
 |---|---|---|
-| `implementer` | The design is decided; build it and prove it works | Sonnet / medium |
-| `investigator` | The answer is not known yet; diagnose, reproduce, root-cause | Sonnet / high |
-| `verifier` | Independently confirm a claim against the artifact | Sonnet / high |
-| `platform` | Infrastructure, deployment, and live systems | Sonnet / high |
+| `noel-workflow:implementer` | The design is decided; build it and prove it works | Sonnet / medium |
+| `noel-workflow:investigator` | The answer is not known yet; diagnose, reproduce, root-cause | Sonnet / high |
+| `noel-workflow:verifier` | Independently confirm a claim against the artifact | Sonnet / high |
+| `noel-workflow:platform` | Infrastructure, deployment, and live systems | Sonnet / high |
 
 Pass `model: opus` at spawn time to escalate a specific task without changing the preset — this
 preserves the escalation rule from the execution plan's tier table ("escalate that specific task
@@ -201,8 +207,9 @@ No `Co-Authored-By` trailer.
 **Merging and deploying happen only in the session the developer is directly talking to, and only
 after the developer explicitly confirms.** A subagent that finishes real work commits, pushes a
 branch, and opens a PR if one doesn't exist — then stops and reports. It does not merge that PR, run
-`redeploy.sh`, dispatch `build-images.yml`, or run a mutating `kubectl` command; a `PreToolUse` hook
-(`.claude/hooks/block-subagent-merge-deploy.py`) makes this mechanically true rather than a preset
+`redeploy.sh`, dispatch `build-images.yml`, or run a mutating `kubectl` command; the plugin's
+`PreToolUse` hook `block-subagent-merge-deploy.py` — whose generic patterns are extended with this
+repo's own deploy verbs from `.claude/workflow.json` — makes this mechanically true rather than a preset
 sentence hoping it's followed. This landed after Sprint 8's issue #46, where a `platform` subagent
 diagnosed and fixed a live production bug well, then pushed, opened a PR, and merged it to `main`
 itself in the same delegation — before the developer had seen the diff. The fix held up, which is not

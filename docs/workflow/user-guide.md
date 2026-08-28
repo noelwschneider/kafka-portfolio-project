@@ -141,7 +141,7 @@ Two out-of-order uses are worth doing on purpose:
 |---|---|
 | An agent stopped early or was cut off | Ask it to continue by name — it keeps its history and resumes. Don't start a fresh one and lose the partial work |
 | An agent is blocked by the report gate | Read the message; it names what's missing. Usually it hasn't verified against a running system yet |
-| An agent lacks a tool it needs | Add it to that preset's `tools` list in `.claude/agents/` |
+| An agent lacks a tool it needs | Add it to that preset's `tools` list in the `noel-workflow` plugin's `agents/` — note this changes it for every project using the plugin |
 | Board writes fail with a bad ID | Option IDs changed. `/board` has the refresh command |
 | You want to undo Claude's edits | `/rewind` — though background agents' edits fall outside checkpoints, so use git for those |
 | Context is getting long | `/compact`, `/clear`, or `/context` to see what's consuming it |
