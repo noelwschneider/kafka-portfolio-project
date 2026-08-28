@@ -272,6 +272,47 @@ YES
 YES
 ```
 
+### CI on the PR
+
+```
+$ gh pr view 87 --json baseRefName,headRefName,state
+base=main head=workflow/extract-noel-workflow-plugin state=OPEN
+
+$ gh pr checks 87 --watch
+Required checks       pass      3s
+changes               pass      8s
+frontend              skipping  0
+fulfillment-service   skipping  0
+inventory-service     skipping  0
+order-service         skipping  0
+payment-service       skipping  0
+scenario-service      skipping  0
+```
+
+The service jobs skip correctly — no service code was touched. `gh pr checks` first reported "no
+checks reported"; per `git.md`'s guidance I confirmed via the API that a suite *had* been created
+(`total_count=2`, GitHub Actions `in_progress`) rather than close/reopening, and it resolved on its
+own.
+
+### Dogfooding the runtime board resolution
+
+The `Ready to Merge` transition was made using the new `board-transition` skill's own procedure —
+nothing hardcoded, everything resolved from `.claude/workflow.json` plus the API:
+
+```
+$ OWNER=$(python3 -c "...json.load(open('.claude/workflow.json'))['board']['owner']")
+resolved from workflow.json: owner=noelwschneider number=7
+runtime-resolved: project=PVT_kwHOB38DIc4BhEqT field=PVTSSF_lAHOB38DIc4BhEqTzhgB0vE
+                  option=bfcc30c4 item=PVTI_lAHOB38DIc4BhEqTzg4eFr8
+
+$ gh project item-list 7 --owner noelwschneider --limit 200 --format json --jq '...'
+#81 Extract, parameterize, and validate the reusable workflow system -> Status: Ready to Merge
+```
+
+The resolved project, field, and option ids are **identical** to the ones that used to be hardcoded
+in the four presets and the `board` skill — so the runtime path is equivalent, and the id table was
+safe to delete rather than port.
+
 ### Every persistent change outside this repo, verified against the filesystem afterward
 
 This is the itemized list required by the brief, produced by reading the filesystem after the work,
