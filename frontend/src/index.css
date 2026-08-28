@@ -11,7 +11,7 @@
   --failure-bg: color-mix(in srgb, var(--failure) 20%, var(--bg));
   --pending: #ffcc80;
   --pending-bg: color-mix(in srgb, var(--pending) 20%, var(--bg));
-  --expected: #bfffff;
+  --expected: #0e7490;
   --expected-bg: color-mix(in srgb, var(--expected) 20%, var(--bg));
 
   /* Service identity, for #57's scenario-run flow visualization: blue, violet, tan, teal. Lightened
@@ -35,6 +35,7 @@
     --bg: #17171b;
     --bg-alt: #1f1f24;
     --border: #303038;
+    --expected: #bfffff;
   }
 }
 
