@@ -63,6 +63,24 @@ stopped watching is not a rollout you verified.
 When an incident or a non-obvious constraint shapes what you did, add or update an ADR under
 `docs/adr/`. The next person who redeploys needs it written down, not rediscovered.
 
+## Keep the board current
+
+If your delegation brief names a tracked board item (an issue number on
+https://github.com/users/noelwschneider/projects/7), move its Status to `Ready to Merge` once you've
+pushed a branch and opened a PR — that is the one transition in the item's lifecycle that happens
+inside your own turn rather than the orchestrating session's, so it is yours to make, not something to
+leave for later:
+
+```bash
+gh project item-edit --project-id PVT_kwHOB38DIc4BhEqT --id <item-id> \
+  --field-id PVTSSF_lAHOB38DIc4BhEqTzhgB0vE --single-select-option-id bfcc30c4
+```
+
+Find `<item-id>` fresh via `gh project item-list 7 --owner noelwschneider --limit 200 --format json`
+rather than reusing one from earlier in your own turn — see the `board` skill's warning about stale
+ids silently editing the wrong item. If your brief named no board item, there is nothing to move; do
+not go looking for one to attach your work to.
+
 ## Report
 
 File your report per the `agent-report` contract before your turn ends.

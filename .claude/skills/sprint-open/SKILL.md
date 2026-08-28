@@ -39,8 +39,8 @@ Stop and say what is wrong rather than proceeding if any of these fail:
   they've drifted apart, say exactly where and let the developer decide which one is right rather than
   silently trusting either.
 - **The previous sprint is closed.** Check `docs/planning/README.md` and the board. If the previous
-  sprint still has items in `In Progress`, say so — opening over an unclosed sprint loses the record of
-  what was actually finished.
+  sprint still has items in `In Progress` or `Ready to Merge`, say so — opening over an unclosed sprint
+  loses the record of what was actually finished.
 
 ## 1. Flip the current-sprint pointer
 

@@ -64,3 +64,11 @@ need to restate them:
 - **A subagent delegating its own assigned work onward** (observed in Phase 8). The preset tool
   allowlists admit only `Agent(Explore)`, a read-only search helper, so handing off implementation
   is mechanically unavailable rather than merely discouraged.
+
+A third failure mode — the project board reading as more done than reality, because nobody advanced
+its Status past the point where they stopped looking — is handled the same way in spirit but not
+mechanically enforceable the way the two above are: no tool-call event corresponds to "the board is
+now stale." Each preset's "Keep the board current" section makes advancing its own item to
+`Ready to Merge` part of finishing the task, not an afterthought, and `.claude/skills/board/check-drift.py`
+gives a repeatable way to catch the cases that still slip through — see the `board` skill's Status
+lifecycle section for the full contract.

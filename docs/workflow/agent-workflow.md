@@ -210,6 +210,15 @@ the same as the process having worked.
 
 Unplanned work is logged to the board too, including retroactively.
 
+**Board status advances at each real handoff, not in a batch afterward.** A subagent that opens a PR
+for a tracked item moves it to `Ready to Merge` before its own turn ends — that transition happens
+inside the subagent's turn, so only the subagent is in a position to make it promptly. The
+orchestrating session moves `Ready to Merge` to `Merged` immediately after actually running
+`gh pr merge`, and `Merged` to `Deployed` only once a `/deploy` run's own verification confirms the
+work is actually live — not merely because time has passed since the merge. See the `board` skill's
+Status lifecycle section for the full state list and `check-drift.py` for a mechanical cross-check
+against each item's linked issue.
+
 ### Close and review
 
 Closing establishes what happened: the board reconciled against reality, goals confirmed against the
