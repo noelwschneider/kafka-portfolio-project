@@ -114,7 +114,7 @@ review (nav/scenario-card polish, an Architecture page streamline) — see
 |---|---|
 | [`sprint-8/sprint-8-plan.md`](sprint-8/sprint-8-plan.md) | This sprint's goals, sequencing, developer-involvement checkpoints, and dependencies |
 
-### `sprint-9/` — workflow portability and resumability (current)
+### `sprint-9/` — workflow portability and resumability (complete)
 
 Theme: making the project's own agentic workflow — presets, skills, hooks, standing rules — usable
 outside this repo, plus a handoff doc so returning to the project after a gap doesn't mean
