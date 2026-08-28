@@ -238,17 +238,29 @@ work instead of a recurring half hour.
 
 **Worktree isolation for `implementer`.** Adding `isolation: worktree` to the preset would prevent two
 concurrent subagents landing conflicting changes in one tree — a failure this project has already hit.
-It is not enabled by default because a worktree is a fresh checkout: `docker compose` verification
-needs the gitignored environment files carried in via a `.worktreeinclude`, and that path is unproven
-here. Still unresolved as of Sprint 4, which ran genuinely parallel delegations by having the
-orchestrating session reason manually about file overlap before choosing to parallelize or sequence —
-that worked without a single landed conflict across ~20 delegations, so isolation is not urgently
-blocking. What Sprint 4 actually broke was different: three agents each running a full-stack
-`docker compose up --build -d` at the same time OOM-killed `kafka`, `inventory-service`, and
-`scenario-service` on the shared host. Worktree isolation would not have prevented that — separate
-worktrees running separate full stacks would have made memory pressure worse, not better. The
-immediate mitigation landed in the `implementer` preset instead: rebuild only the service(s) a change
-actually touches, not the whole stack, when other delegations may be running concurrently.
+Still not enabled by default: the Agent tool's `isolation: "worktree"` option was tested directly
+against this repo in Sprint 9 and fails outright with `error: unknown option 'no-track'` from `git
+worktree add` — a flag added in git 2.19. The failure is not the git-version ceiling it first looked
+like: manually running `git worktree add`/`remove` with `/opt/homebrew/bin/git` (2.50.1) on this same
+machine works fully, including the lifecycle operations (`remove`) that the plain `git` on `PATH`
+can't do at all because it resolves to `/usr/local/bin/git` 2.15.0. The shell PATH fix that put
+Homebrew's git ahead of `/usr/local/bin` in the developer's own interactive terminal does not reach
+the process tree the Agent tool's own worktree creation runs in — that process was started before the
+fix and inherits its original environment regardless of what `~/.zshrc`/`~/.zprofile` now say, so a
+`.zshrc` edit alone does not resolve this; the Claude Code process itself needs to be restarted (fresh
+launch, not just a fresh shell) after the PATH fix for it to take effect. Until that's confirmed to
+close the gap, worktree isolation stays off by default and `docker compose` verification needs the
+gitignored environment files carried in via a `.worktreeinclude`, a path that remains unproven for a
+different reason: no worktree has successfully formed to test it against. Sprint 4 ran genuinely
+parallel delegations by having the orchestrating session reason manually about file overlap before
+choosing to parallelize or sequence — that worked without a single landed conflict across ~20
+delegations, so isolation is not urgently blocking. What Sprint 4 actually broke was different: three
+agents each running a full-stack `docker compose up --build -d` at the same time OOM-killed `kafka`,
+`inventory-service`, and `scenario-service` on the shared host. Worktree isolation would not have
+prevented that — separate worktrees running separate full stacks would have made memory pressure
+worse, not better. The immediate mitigation landed in the `implementer` preset instead: rebuild only
+the service(s) a change actually touches, not the whole stack, when other delegations may be running
+concurrently.
 
 **Resource-scoped rebuilds vs. worktree isolation aren't the same problem.** Worktree isolation is
 about two agents editing the same file; the OOM incident was about N agents sharing one host's finite
